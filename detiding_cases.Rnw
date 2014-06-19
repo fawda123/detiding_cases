@@ -1,0 +1,173 @@
+\documentclass{article}
+\usepackage[top=1in,bottom=1in,left=1in,right=1in]{geometry}
+\usepackage{cleveref}
+
+% knitr options
+<<opts, echo = F>>=
+# knitr options
+opts_chunk$set(warning = F, message = F,
+  tidy.opts = list(width.cutoff = 65), fig.align = 'center', 
+  dev = 'pdf', dev.args = list(family = 'serif'))
+@
+
+\begin{document}
+
+\setlength{\parskip}{5mm}
+\setlength{\parindent}{0in}
+
+\title{Case examples for removal of advection effects on DO measurements}
+\author{Marcus W. Beck}
+\maketitle
+
+\section{Overview}
+
+Four stations from the SWMP database were chosen as case examples for evaluating effectiveness of weighted regression to detide the DO signal.  Stations were chosen to represent unique combinations of relatively high or low tidal range and high or low production range.
+
+\clearpage
+
+%%%%%%
+% figures
+
+% maps of each case
+<<case_map, fig.height = 8, fig.width = 8, eval = T, echo = F, fig.cap = 'Satellite view of each case. KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide.'>>=
+
+# low do/high tide, high do/low tide, low do/low tide, high do/low tide
+cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+
+# zooms for each case
+zooms <- c(11, 12, 11, 15)
+
+for(case in cases){
+  
+  case_meta <- get_map_meta(case)
+  
+  mapImageData<-get_map(
+    location=c(lon=mean(case_meta$Longitude),lat=mean(case_meta$Latitude)),
+    source='google',
+    maptype='satellite',
+    zoom = zooms[case == cases]
+    )
+  
+  reserve <- trim.trailing(unique(case_meta$Reserve.Name))
+  
+  p <- ggmap(mapImageData,
+    extent = "panel", 
+    base_layer=ggplot(data=case_meta, aes(x =Longitude, 
+      y=Latitude, group='Station.Code'))
+      ) + 
+    geom_point(size = 3, colour = 'lightblue') +
+    geom_text(data=case_meta,aes(x=Longitude,y=Latitude,label=Station,
+      hjust=0.4,vjust=2),size=6, colour = 'lightblue') +
+    ggtitle(reserve) 
+  
+  assign(paste0('p', which(case == cases)), p)
+  
+  }
+
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+@
+\clearpage
+
+% time series and metab ests for each case
+<<case_wq, fig.height = 5, fig.width = 8, echo = F, fig.cap = 'KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide'>>=
+
+# low do/high tide, high do/low tide, low do/low tide, high do/low tide
+cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+
+subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
+# subs <- c(1:100000)
+# subs <- list(subs, subs, subs, subs)
+
+# get tidal summaries
+files <- list.files('M:/wq_models/SWMP/raw/rproc/tide_preds/', 
+  pattern = paste(cases, collapse = '|'), 
+  full.names = T)
+file_ls <- list()
+for(file in files){
+  load(file)
+  nm <- gsub('.RData', '', basename(file))
+#   cat(nm, '\t')
+  tmp <- get(nm)[subs[[which(file == files)]], ]
+  tmp$row <- subs[[which(file == files)]]
+  file_ls[[nm]] <- tmp
+  }
+
+# for metab plots
+dt_rngs <- lapply(file_ls, function(x) as.Date(range(x$DateTimeStamp)))
+
+tide <- melt(file_ls, id.var = names(file_ls[[1]]))
+
+to_plo1 <- tide
+p1 <- ggplot(to_plo1, aes(x = DateTimeStamp, y = Tide,
+    colour = L1)) + 
+  geom_line() + 
+  facet_wrap(~L1, scales = 'free_x', ncol = 1) + 
+  scale_x_datetime(name=element_blank()) + 
+  theme_bw() +
+  theme(legend.position = 'none')
+
+##
+# get wq
+files <- list.files('M:/wq_models/SWMP/raw/rproc/proc5/', 
+  pattern = paste(cases, collapse = '|'), 
+  full.names = T)
+file_ls <- list()
+for(file in files){
+  load(file)
+  nm <- gsub('.RData', '', basename(file))
+#   cat(nm, '\t')
+  tmp <- get(nm)[subs[[which(file == files)]], c('DateTimeStamp', 'DO_mgl')]
+  tmp$row <- subs[[which(file == files)]]
+  file_ls[[nm]] <- tmp
+  }
+
+DO_mgl <- melt(file_ls, id.var = names(file_ls[[1]]))
+
+to_plo2 <- DO_mgl
+p2 <- ggplot(to_plo2, aes(x = DateTimeStamp, y = DO_mgl,
+    colour = L1)) + 
+  geom_line() + 
+  facet_wrap(~L1, scales = 'free_x', ncol = 1) + 
+  scale_x_datetime(name=element_blank()) + 
+  theme_bw()  +
+  theme(legend.position = 'none')
+
+grid.arrange(p1, p2, ncol = 2)
+@
+<<case_wq_met, fig.height = 5, fig.width = 8, echo = F, fig.cap = 'KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide'>>=
+##
+# air-sea exchange, Pg, Rt
+load('M:/wq_models/SWMP/raw/rproc/dat_nem.RData')
+
+daily_met <- dat.nem[cases]
+daily_met <- sapply(1:length(daily_met),
+  function(x){
+    
+    dt_rng <- dt_rngs[[which(names(daily_met) == names(dt_rngs)[x])]]
+    out <- daily_met[[x]]
+    sel_vec <- out$Date >= dt_rng[1] & out$Date <= dt_rng[2]
+    out[sel_vec, c('Date', 'D', 'Pg', 'Rt')]
+    
+    }, 
+  simplify = F
+  )
+names(daily_met)<- cases
+daily_met <- melt(daily_met, id.var = names(daily_met[[1]]))
+
+
+to_plo3 <- daily_met
+to_plo3 <- melt(to_plo3, id.var = c('Date', 'L1'))
+
+p3 <- ggplot(to_plo3, aes(x = Date, y = value, group = L1, colour = L1)) + 
+  geom_line(aes(linetype = variable)) + 
+  facet_wrap(variable ~ L1, scales='free') + 
+  scale_x_date(name=element_blank()) + 
+  theme_bw() +
+  theme(legend.position = 'none')
+
+print(p3)
+@
+
+
+\end{document}
