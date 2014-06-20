@@ -1,0 +1,23 @@
+---
+title: "README"
+output: html_document
+---
+
+Four case studies include:
+
+KACHD (high tide/low DO)
+MARMB (low tide/low DO)
+PDDBY (high tide/high DO)
+WKBFR (low tide/high DO)
+
+Chosen based on geographic distribution, mean air-sea gas exchange, and relative amounts of anomolous values
+
+.RData files are:
+
+XXXXX_intgrd_td - interpolation grid for a site using regressoin w/ tide
+XXXXX_intgrd_dtd - interpolatiion grid for a site using regression with tidal derivative
+XXXXX_prdnrm_td - predicted/normalized results using tidal regression
+XXXXX_prdnrm_dtd - predicted/normalized results using tidal derivative
+met_ls_td - metabolism estimates for all sites using tidal regression
+met_ls_dtd - metabolism estimates for all sites using tidal derivative
+site_sel - data for creating plot to select sites, all SWMP sites

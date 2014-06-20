@@ -1598,9 +1598,7 @@ interp_grd <- function(dat_in, dtide_div = 10,
 # 'parallel' is logical if using ddply in parallel, must setup backend first
 # 'progress' is logical that makes log, note that this isn't the progress used by ddply
 interp_td_grd <- function(dat_in, tide_div = 10,
-  wins = list(4, 12, NULL), parallel = F, progress = F){
-  
-  require(plyr)
+  wins = list(4, 12, NULL)){
   
   # assign to local env for ddply
   tide_div <- tide_div
@@ -1613,9 +1611,7 @@ interp_td_grd <- function(dat_in, tide_div = 10,
   
   out <- ddply(dat_in, 
     .variable = 'DateTimeStamp',
-    .parallel = parallel,
-#     .paropts = list(.export = c('dtide_div', 'dtide.grid', 'dat_in', 
-#         'wins')),
+    .parallel = F,
     .fun = function(row){
       
       # row for prediction
@@ -1623,15 +1619,15 @@ interp_td_grd <- function(dat_in, tide_div = 10,
       ref_in <- ref_in[rep(1, tide_div),]
       ref_in$Tide <- tide.grid
       
-      # progress
-      if(progress){
-        prog <- which(row$DateTimeStamp == dat_in$DateTimeStamp)
-        sink('log.txt')
-        cat('Log entry time', as.character(Sys.time()), '\n')
-        cat(prog, ' of ', nrow(dat_in), '\n')
-        print(Sys.time() - strt)
-        sink()
-        }
+#       # progress
+#       if(progress){
+#         prog <- which(row$DateTimeStamp == dat_in$DateTimeStamp)
+#         sink('log.txt')
+#         cat('Log entry time', as.character(Sys.time()), '\n')
+#         cat(prog, ' of ', nrow(dat_in), '\n')
+#         print(Sys.time() - strt)
+#         sink()
+#         }
       
       # get wts
       ref_wts <- wt_fun(ref_in, dat_in, wins = wins, slice = T, 
@@ -1660,7 +1656,7 @@ interp_td_grd <- function(dat_in, tide_div = 10,
             
               # get model
               mod_md <- lm(
-                DO_obs ~ dec_time + Tide + sin(2*pi*dec_time) + cos(2*pi*dec_time),
+                DO_obs ~ dec_time + Tide, # + sin(2*pi*dec_time) + cos(2*pi*dec_time),
                 weights = ref_wts,
                 data = dat_proc
                 )
@@ -1809,7 +1805,7 @@ prdnrm_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs'){
   dat_in$DO_pred <- DO_pred$V1
    
   # add normalized to 'dat_in'
-  dat_in$DO_nrm <- DO_nrm$V1  
+  dat_in$DO_nrm <- DO_nrm$V1
   
   return(dat_in)
   
@@ -1844,8 +1840,8 @@ prdnrm_td_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs'){
   # add predicted to 'dat_in'
   dat_in$DO_pred <- DO_pred$V1
    
-  # add normalized to 'dat_in'
-  dat_in$DO_nrm <- DO_nrm$V1  
+  # add normalized to 'dat_in', note that DO_obs is a chr object
+  dat_in$DO_nrm <- DO_nrm$V1  + dat_in[, DO_obs] - dat_in[, 'DO_pred']  
   
   return(dat_in)
   
