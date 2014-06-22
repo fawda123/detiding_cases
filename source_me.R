@@ -34,10 +34,10 @@ strt <- Sys.time()
 
 # case_subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
 wins_subs <- list(
-  list(4, 12, NULL), 
-  list(4, 12, NULL), 
-  list(4, 12, NULL), 
-  list(4, 12, NULL)
+  list(4, 6, NULL), 
+  list(4, 6, NULL), 
+  list(4, 6, NULL), 
+  list(4, 6, NULL)
   )
 
 strt <- Sys.time()
@@ -46,8 +46,8 @@ strt <- Sys.time()
 foreach(case = cases) %dopar% {
    
   to_proc <- prep_wtreg(case)
-  subs <- with(to_proc, as.numeric(format(DateTimeStamp, '%Y')) == 2010 &
-      as.numeric(format(DateTimeStamp, '%m')) == 6)
+  subs <- with(to_proc, grepl('2012', format(DateTimeStamp, '%Y'))) #&
+#       grepl('6',format(DateTimeStamp, '%m')))
   to_proc <- to_proc[subs, ]
   
   # progress
@@ -60,30 +60,19 @@ foreach(case = cases) %dopar% {
   # get windows
   wins_in <- wins_subs[[which(case == cases)]]
   
-  # create wt reg contour surface
-  int_proc <- interp_td_grd(to_proc, wins = wins_in)
+  # get pred, norm
+  wtreg <- wtreg_fun(to_proc, wins = wins_in, parallel = F, progress = F)
   
-  # get predicted, normalized from interpolation grid
-  prd_nrm <- prdnrm_td_fun(int_proc, to_proc)
-  
-  # save interpolation grid
-  int_nm <-paste0(case, '_intgrd_td') 
-  assign(int_nm, int_proc)
+  # save results
+  wtreg_nm <-paste0(case, '_wtreg') 
+  assign(wtreg_nm, wtreg)
   save(
-    list = int_nm,
-    file=paste0(case,'_intgrd_td.RData')
-    )
-  
-  # save predicted, normalized results
-  prdnrm_nm <-paste0(case, '_prdnrm_td') 
-  assign(prdnrm_nm, prd_nrm)
-  save(
-    list = prdnrm_nm,
-    file=paste0(case,'_prdnrm_td.RData')
+    list = wtreg_nm,
+    file=paste0(case,'_wtreg.RData')
     )
 
   # clear RAM
-  rm(list = c(int_nm, prdnrm_nm))
+  rm(list = wtreg_nm)
   
   }
 

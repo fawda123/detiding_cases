@@ -214,22 +214,14 @@ print(p3)
 
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
 cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
-pdf('C:/Users/mbeck/Desktop/exs.pdf', height = 8, width = 10, family = 'serif')
+pdf('C:/Users/mbeck/Desktop/exs.pdf', height = 6, width = 10, family = 'serif')
 for(case in cases){
 
-load(paste0(case, '_prdnrm_td.RData'))
-load(paste0(case, '_intgrd_td.RData'))
+load(paste0(case, '_wtreg.RData'))
 
-prdnrm <- get(paste0(case, '_prdnrm_td'))
-int_grd <- get(paste0(case, '_intgrd_td'))
+prdnrm <- get(paste0(case, '_wtreg'))
 
-# load(paste0(case, '_prdnrm_dtd.RData'))
-# load(paste0(case, '_intgrd_dtd.RData'))
-# 
-# prdnrm <- get(paste0(case, '_prdnrm_dtd'))
-# int_grd <- get(paste0(case, '_intgrd_dtd'))
-
-subs <- 1:nrow(prdnrm)
+subs <- 1:1500#nrow(prdnrm)
 
 to_plo <- prdnrm[subs,]
 to_plo <- met.day.fun(to_plo, case)
@@ -242,7 +234,7 @@ fmt <- function(){
 
 p1 <- ggplot(to_plo, aes(x = DateTimeStamp, y = DO_obs, colour = 'DO_obs')) + 
   geom_line() +
-  geom_line(aes(y = DO_pred, colour = 'DO_pred'), size = 1) +
+  geom_line(aes(y = DO_prd, colour = 'DO_prd'), size = 1) +
   geom_line(aes(y = DO_nrm, colour = sunrise, group = 1), size = 1) +
   scale_y_continuous(labels = fmt()) +
   theme_bw() + 
@@ -258,37 +250,36 @@ p2 <- ggplot(to_plo, aes(x = DateTimeStamp, y = Tide, group = 1,
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = 'top')
 
-sim_grd <- int_grd[subs[1]:(10*subs[length(subs)]),]
-
-p3 <- ggplot(sim_grd, aes(x = DateTimeStamp, y = Tide, 
-    z = DO_pred, fill = DO_pred)) +
-  geom_tile() + 
-  scale_fill_gradientn(colours=cm.colors(3)) +
-  scale_x_datetime(expand = c(0,0)) + 
-  scale_y_continuous(expand = c(0,0), labels = fmt()) +
-  ylab('Tide') +
-  theme_bw() +
-  theme(legend.title = element_blank(), legend.position = 'top')
-
-grid.arrange(p1, p2, p3, ncol = 1)
+grid.arrange(p1, p2, ncol = 1)
 
 }
 dev.off()
+
+##
+# metabolism data
+pdf('C:/Users/mbeck/Desktop/cases_metabs.pdf', height = 10, width = 8, 
+  family = 'serif')
+for(case in cases){
+  
+load(paste0(case, '_wtreg.RData'))
+
+prdnrm <- get(paste0(case, '_wtreg'))
+prdnrm$DO_act <- with(prdnrm, DO_obs - DO_prd)
+  
 # get metabs
 met_subs <- 1:nrow(prdnrm)
 dat_met_obs <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_obs')
-dat_met_prd <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_pred')
+dat_met_prd <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_prd')
 dat_met_nrm <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_nrm')
-
-anoms.fun(dat_met_obs)
-anoms.fun(dat_met_prd)
-anoms.fun(dat_met_nrm)
+dat_met_nrm <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_act')
 
 to_plo1 <- melt(dat_met_obs, id.var = 'Date', 
   measure.var = c('NEM', 'Pg', 'Rt'))
 to_plo2 <- melt(dat_met_prd, id.var = 'Date', 
   measure.var = c('NEM', 'Pg', 'Rt'))
 to_plo3 <- melt(dat_met_nrm, id.var = 'Date', 
+  measure.var = c('NEM', 'Pg', 'Rt'))
+to_plo4 <- melt(dat_met_act, id.var = 'Date', 
   measure.var = c('NEM', 'Pg', 'Rt'))
 
 p1 <- ggplot(to_plo1, aes(x = Date, y = value, group = variable, 
@@ -303,11 +294,14 @@ p3 <- ggplot(to_plo3, aes(x = Date, y = value, group = variable,
     colour = variable)) +
   geom_line() +
   theme_bw()
-grid.arrange(p1, p2, p3, ncol = 1)
-
-pair_plo <- prdnrm[,c('Tide', 'dTide', 'DO_obs', 'DO_pred', 'DO_nrm')]
- 
-ggpairs(pair_plo)
+p4 <- ggplot(to_plo4, aes(x = Date, y = value, group = variable, 
+    colour = variable)) +
+  geom_line() +
+  theme_bw()
+grid.arrange(p1, p2, p3, p4, ncol = 1)
+}
+dev.off()
+  
 
 ######
 # get summary plots of metab before/after
@@ -319,20 +313,20 @@ names(met_ls) <- cases
 
 for(case in cases){
 
-  load(paste0(case, '_prdnrm_dtd.RData'))
-  load(paste0(case, '_intgrd_dtd.RData'))
-  
-  prdnrm <- get(paste0(case, '_prdnrm_dtd'))
-  int_grd <- get(paste0(case, '_intgrd_dtd'))
+  load(paste0(case, '_wtreg.RData'))
+
+  prdnrm <- get(paste0(case, '_wtreg'))
+  prdnrm$DO_act <- with(prdnrm, DO_obs - DO_prd)
   
   # get metabs
   dat_met_obs <- nem.fun(prdnrm, case, DO_var = 'DO_obs')
-  dat_met_prd <- nem.fun(prdnrm, case, DO_var = 'DO_pred')
+  dat_met_prd <- nem.fun(prdnrm, case, DO_var = 'DO_prd')
   dat_met_nrm <- nem.fun(prdnrm, case, DO_var = 'DO_nrm')
+  dat_met_act <- nem.fun(prdnrm, case, DO_var = 'DO_act')
   met_out <- list(obs = dat_met_obs, prd = dat_met_prd, 
-    nrm = dat_met_nrm)
+    nrm = dat_met_nrm, act = dat_met_act)
   met_out <- llply(met_out,
-    .fun = function(x) x[, !names(x) %in% c('DO_obs', 'DO_pred', 'DO_nrm')])
+    .fun = function(x) x[, !names(x) %in% c('DO_obs', 'DO_prd', 'DO_nrm', 'DO_act')])
     
   met_out <- melt(met_out, id.var = names(met_out[[1]]))
   
@@ -340,28 +334,21 @@ for(case in cases){
     
   }
 
-met_ls_dtd <- met_ls
+save(met_ls, file = 'met_ls.RData')
 
 # add cat variable for anom v non-anom
-to_plo <- llply(met_ls_dtd, 
+# calculate summary data for each category combo
+to_plo <- llply(met_ls, 
   .fun = function(x) {
     
-    x$Pg_cats <- 'Regs'
-    x$Pg_cats[x$Pg < 0] <- 'Anom'
-    x$Pg_cats[is.na(x$Pg)] <- NA
-    x$Rt_cats <- 'Regs'
-    x$Rt_cats[x$Rt > 0] <- 'Anom'
-    x$Rt_cats[is.na(x$Rt)] <- NA
-    
-    Pg_out <- na.omit(summarySE(
-      x, measurevar = 'Pg', groupvars = c('L1', 'Pg_cats'))
+    Pg_out <- summarySE(
+      na.omit(x), measurevar = 'Pg', groupvars = c('L1')
       )
-    names(Pg_out)[names(Pg_out) %in% c('L1','Pg', 'Pg_cats')] <- c('DO_typ', 'met_cat', 'mean')
+    names(Pg_out)[names(Pg_out) %in% c('L1','Pg')] <- c('DO_typ', 'mean')
     Pg_out$var <- 'Pg'
-    Rt_out <- na.omit(
-      summarySE(x, measurevar = 'Rt', groupvars = c('L1', 'Rt_cats'))
+    Rt_out <-summarySE(na.omit(x), measurevar = 'Rt', groupvars = c('L1')
       )
-    names(Rt_out)[names(Rt_out) %in% c('L1','Rt', 'Rt_cats')] <- c('DO_typ', 'met_cat', 'mean')
+    names(Rt_out)[names(Rt_out) %in% c('L1','Rt')] <- c('DO_typ', 'mean')
     Rt_out$var <- 'Rt'
     
     rbind(Pg_out, Rt_out)
@@ -370,33 +357,15 @@ to_plo <- llply(met_ls_dtd,
   )
 
 to_plo <- melt(to_plo, id.var = names(to_plo[[1]]))
-to_plo$DO_typ <- factor(to_plo$DO_typ, levels = c('obs', 'prd', 'nrm'), 
-  labels = c('Obs', 'Prd', 'Nrm'))
-
-to_eval <- llply(met_ls, 
-  .fun = function(x) {
-    
-    x$Pg_cats <- 'Regs'
-    x$Pg_cats[x$Pg < 0] <- 'Anom'
-    x$Pg_cats[is.na(x$Pg)] <- NA
-    x$Rt_cats <- 'Regs'
-    x$Rt_cats[x$Rt > 0] <- 'Anom'
-    x$Rt_cats[is.na(x$Rt)] <- NA
-    
-    Pg_test <- TukeyHSD(aov(Pg ~ Pg_cats * L1, data = x))
-    Rt_test <- TukeyHSD(aov(Rt ~ Rt_cats * L1, data = x))
-
-    list(Pg = Pg_test, Rt = Rt_test)
-      
-    }
-  )
+to_plo$DO_typ <- factor(to_plo$DO_typ, levels = c('obs', 'prd', 'nrm','act'), 
+  labels = c('Obs', 'Prd', 'Nrm', 'Act'))
 
 # metab summary
-ggplot(to_plo, aes(x = met_cat, y = mean, fill = DO_typ)) +  
+ggplot(to_plo, aes(x = var, y = mean, fill = DO_typ)) +  
   geom_bar(stat = 'identity', position = position_dodge(.9)) + 
   geom_errorbar(position = position_dodge(.9), width=.25, 
     aes(ymin = mean - sd, ymax = mean + sd)) +
-  facet_grid(var ~ L1) +
+  facet_grid( ~ L1) +
   theme_bw() +
   theme(legend.title = element_blank())
 
