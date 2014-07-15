@@ -29,13 +29,13 @@ Four stations from the SWMP database were chosen as case examples for evaluating
 % figures
 
 % maps of each case
-<<case_map, fig.height = 8, fig.width = 8, eval = T, echo = F, fig.cap = 'Satellite view of each case. KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide.'>>=
+<<case_map, fig.height = 8, cache = T, fig.width = 8, eval = T, echo = F, fig.cap = 'Satellite view of each case. KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide.'>>=
 
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
 
-# zooms for each case
-zooms <- c(11, 12, 11, 15)
+# zooms for each case, larger is more zoom
+zooms <- c(13, 13, 12, 15)
 
 for(case in cases){
   
@@ -70,14 +70,13 @@ grid.arrange(p1, p2, p3, p4, ncol = 2)
 \clearpage
 
 % time series and metab ests for each case
-<<case_wq, fig.height = 5, fig.width = 8, echo = F, fig.cap = 'KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide'>>=
+<<case_wq, fig.height = 5, cache = T, fig.width = 8, echo = F, fig.cap = 'KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide'>>=
 
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
 
-subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
+subs <- list(35000:36500, 60000:61500, 10000:11500, 88500:90000)
 # subs <- c(1:100000)
-# subs <- list(subs, subs, subs, subs)
 
 # get tidal summaries
 files <- list.files('M:/wq_models/SWMP/raw/rproc/tide_preds/', 
@@ -135,7 +134,7 @@ p2 <- ggplot(to_plo2, aes(x = DateTimeStamp, y = DO_mgl,
 
 grid.arrange(p1, p2, ncol = 2)
 @
-<<case_wq_met, fig.height = 5, fig.width = 8, echo = F, fig.cap = 'KACHD: low DO/high tide, PDBBY: high DO/high tide, MARMB: low DO/low tide, WKBFR: high DO/low tide'>>=
+<<case_wq_met, fig.height = 5, fig.width = 8, echo = F, fig.cap = 'Metabolism for each station'>>=
 ##
 # air-sea exchange, Pg, Rt
 load('M:/wq_models/SWMP/raw/rproc/dat_nem.RData')
@@ -169,5 +168,9 @@ p3 <- ggplot(to_plo3, aes(x = Date, y = value, group = L1, colour = L1)) +
 print(p3)
 @
 
+% tidal regression before/after
+<<>>=
+
+@
 
 \end{document}

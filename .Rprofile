@@ -17,6 +17,7 @@ library(GGally)
 library(gridExtra)
 library(ggmap)
 library(data.table)
+library(oce)
 
 # functions to use
 source('case_funs.r')
