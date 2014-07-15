@@ -563,3 +563,27 @@ names(daily_do) <- c('site', 'daily_rng', 'daily_avg')
 
 ##
 # get metab summaries
+
+# metab data
+load('M:/wq_models/SWMP/raw/rproc/dat_nem.RData')
+
+met_sum <- adply(matrix(cases, ncol = 1),
+  1,
+  .fun = function(x){
+    
+    met <- dat.nem[[x]][, c('Pg', 'Rt', 'NEM')]
+    colMeans(met, na.rm = T)
+     
+    }
+  )
+met_sum$X1 <- NULL
+met_sum$site <- cases
+
+##
+# combine data 
+# tide_comps, daily_do, met_sum
+
+to_tab <- cbind(tide_comps, daily_do, met_sum)
+to_tab <- to_tab[, !names(to_tab) %in% 'site']
+
+

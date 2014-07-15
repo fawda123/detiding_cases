@@ -272,9 +272,10 @@ nem.fun<-function(dat.in, stat, DO_var = 'DO_mgl', depth.val = NULL,
 # output is hourly net production (GPP - R)
 # 'dat.in' is station data frame 
 # 'stat' is character string for station
+# 'DO_var' is character string of column with DO to be evaluated
 # 'depth.val' is optional numeric vector for station depth
 # 'meta.path' is path for SWMP metadata file
-inst.flux.fun <- function(dat.in, stat, depth.val = NULL, 
+inst.flux.fun <- function(dat.in, stat, DO_var = 'DO_mgl', depth.val = NULL, 
   meta.path = NULL){
   
   ##dependent packages
@@ -288,14 +289,8 @@ inst.flux.fun <- function(dat.in, stat, depth.val = NULL,
   flush.console()
   strt<-Sys.time()
   
-  # columns to be removed prior to processing
-  # 'flag' retained for inst.flux calcs
-  flag <- dat.in$flag[-1] # first is NA since based on diff
-  to.rem <- c('flag')
-  dat.in <- dat.in[, !names(dat.in) %in% to.rem]
-  
   #convert DO from mg/L to mmol/m3
-  dat.in$DO<-dat.in$DO_mgl/32*1000
+  dat.in$DO<-dat.in[, DO_var]/32*1000
   
   # get change in DO per hour, as mmol m^-3 hr^-1
   # scaled to time interval to equal hourly rates
@@ -356,7 +351,7 @@ inst.flux.fun <- function(dat.in, stat, depth.val = NULL,
   #DOsat is DO at saturation given temp (C), salinity (st. unit), and press (atm)
   #DOsat converted to mmol/m3
   #used to get loss of O2 from diffusion
-  DOsat<-with(dat.in,DO_mgl/(oxySol(Temp*(1000+SigT)/1000,Sal)))
+  DOsat<-with(dat.in,get(DO_var)/(oxySol(Temp*(1000+SigT)/1000,Sal)))
   
   #station depth, defaults to mean depth value plus 0.5 in case not on bottom
   #uses 'depth.val' if provided
@@ -382,11 +377,8 @@ inst.flux.fun <- function(dat.in, stat, depth.val = NULL,
   proc.dat<-dat.in[,!names(dat.in) %in% c('cDepth','Wdir',
     'SDWDir','ChlFluor','Turb','pH','RH','SpCond','TotPrcp',
     'CumPrcp','TotSoRad','PO4H','NH4F','NO2F','NO3F','NO23F','CHLA_N')]
-  proc.dat<-data.frame(proc.dat,DOsat,dDO,SigT,H,D,flag)
+  proc.dat<-data.frame(proc.dat,DOsat,dDO,SigT,H,D)
   
-  # change name for sunrise/sunset variable to solar
-  names(proc.dat)[names(proc.dat) %in% 'variable'] <- 'solar'
-    
   # get net instantaneous flux, 
   # not corrected for air/sea exchange
   # units are mmol m^-2 hr^-1 (this is why multiplied by H)
@@ -1375,7 +1367,7 @@ wt_fun <- function(ref_in, dat_in,
   }
 
 ######
-# this is a repliate of filled.contour that removes category borders in the legend
+# this is a replicate of filled.contour that removes category borders in the legend
 # http://stackoverflow.com/questions/8068366/removing-lines-within-filled-contour-legend
 filled.contour.hack <- function (x = seq(0, 1, length.out = nrow(z)), y = seq(0, 1, 
     length.out = ncol(z)), z, xlim = range(x, finite = TRUE), 
