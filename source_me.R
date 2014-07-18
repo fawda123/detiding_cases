@@ -25,7 +25,7 @@ setwd('M:/docs/SWMP/detiding_cases/')
 # functions to use
 source('case_funs.r')
 
-cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
+cases <- c('ELKVM','PDBBY', 'RKBMB', 'SAPDC')
 
 # setup parallel backend
 cl <- makeCluster(4)
@@ -33,6 +33,9 @@ registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
 strt <- Sys.time()
+
+# windows to check
+wins <- c(0.25, 0.5, 1, 2, 5)
 
 # do w/ tide, subset by year
 foreach(case = cases) %dopar% {
@@ -42,23 +45,26 @@ foreach(case = cases) %dopar% {
   yr_sel <- yr_sel %in% 2012
   to_proc <- to_proc[yr_sel, ]
   
-  # progress
-  sink('log.txt')
-  cat('Log entry time', as.character(Sys.time()), '\n')
-  cat(which(case == cases), ' of ', length(cases), '\n')
-  print(Sys.time() - strt)
-  sink()
-  
+  # iterate through window lenghts
+  for(i in wins){
   # get pred, norm
-  wtreg <- wtreg_fun(to_proc)
   
-  # save results
-  wtreg_nm <- paste0(case, '_wtreg') 
-  assign(wtreg_nm, wtreg)
-  save(
-    list = wtreg_nm,
-    file=paste0(case,'_wtreg.RData')
-    )
+    wtreg <- wtreg_fun(to_proc, win = i)
+  
+    # progress
+    sink('log.txt')
+    cat('Log entry time', as.character(Sys.time()), '\n')
+    cat('window', i, which(case == cases), 'of', length(cases), '\n')
+    print(Sys.time() - strt)
+    sink()
+    
+    # save results
+    wtreg_nm <- paste0(case, '_wtreg') 
+    assign(wtreg_nm, wtreg)
+    save(
+      list = wtreg_nm,
+      file=paste(case, which(i == wins), 'wtreg.RData', sep = '_')
+      )
 
   # clear RAM
   rm(list = wtreg_nm)
@@ -141,10 +147,14 @@ met_ls_inst <- foreach(case = cases) %dopar% {
   met_obs <- inst.flux.fun(dat_in, stat = case, DO_var = 'DO_obs')
   met_dtd <- inst.flux.fun(dat_in, stat = case, DO_var = 'DO_dtd')
   
-  # combine results
-  met_obs <- met_obs[, c(1:17, 28)]
-  met_out <- data.frame(met_obs, DOF_dtd = met_dtd$DOF)
+  # combine results, DOF corrects for air-sea xchange
+  DOF_obs <- with(met_obs, DOF - D)
+  D_obs <- with(met_obs, D)
+  DOF_dtd <- with(met_dtd, DOF - D)
+  D_dtd <- with(met_dtd, D)
 
+  met_out <- data.frame(met_obs[, 1:17], DOF_obs, D_obs, DOF_dtd, D_dtd)
+  
   # return results (first row is last day of 2011)
   met_out[-1, ]
 

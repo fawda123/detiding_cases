@@ -112,7 +112,7 @@
 
 
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+cases <- c('ELKVM', 'PDBBY', 'RKBMB', 'SAPDC')
 
 # subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
 subs <- c(100000:200000)
@@ -263,7 +263,7 @@ dev.off()
 ######
 # get summary plots of metab before/after
 
-cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
+cases <- c('ELKVM', 'PDBBY', 'RKBMB', 'SAPDC')
 
 met_ls <- vector('list', length = length(cases))
 names(met_ls) <- cases
@@ -330,13 +330,12 @@ pdf('C:/Users/mbeck/Desktop/cases_metabs.pdf', height = 5, width = 8,
 for(case in 1:length(met_ls)){
   
 # get metabs
-dat_met_obs <- met_ls[[case]][[1]]
-dat_met_dtd <- met_ls[[case]][[2]]
+dat_met <- met_ls[[case]]
   
-to_plo1 <- melt(dat_met_obs, id.var = 'Date', 
+to_plo1 <- melt(dat_met, id.var = 'Date', 
   measure.var = c('NEM', 'Pg', 'Rt'))
-to_plo2 <- melt(dat_met_dtd, id.var = 'Date', 
-  measure.var = c('NEM', 'Pg', 'Rt'))
+to_plo2 <- melt(dat_met, id.var = 'Date', 
+  measure.var = c('NEM_dtd', 'Pg_dtd', 'Rt_dtd'))
 
 p1 <- ggplot(to_plo1, aes(x = Date, y = value, group = variable, 
     colour = variable)) +
@@ -498,92 +497,5 @@ par(mfrow = c(3, 1))
 plot(DO_mgl ~ DateTimeStamp,  x[subs,], type = 'l')  
 plot(Tide ~ DateTimeStamp, x[subs, ], type = 'l')
 plot(Depth ~ DateTimeStamp, x[subs, ], type = 'l')
-
-######
-# table of case study characteristics
-
-##
-# get amps (m) of dominant tidal constituents
-
-files <- list.files('M:/wq_models/SWMP/raw/rproc/proc5/', 
-  pattern = paste(cases, collapse = '|'), 
-  full.names = T)
-file_ls <- list()
-for(file in files){
-  load(file)
-  nm <- gsub('.RData', '', basename(file))
-  cat(nm, '\t')
-  tmp <- get(nm)
-  mod <- tidem(tmp$Depth, tmp$DateTimeStamp, 
-    constituents = c('P1', 'O1', 'M2', 'S2'))
-  const <- attr(mod, 'data')$amplitude[-1]
-  names(const) <- attr(mod, 'data')$name[-1]
-    
-  file_ls[[nm]] <- const
-  }
-tide_comps<- data.frame(do.call('rbind', file_ls))
-tide_comps$site <- rownames(tide_comps)
-
-##
-# get mean daily DO range
-
-files <- list.files('M:/wq_models/SWMP/raw/rproc/proc5/', 
-  pattern = paste(cases, collapse = '|'), 
-  full.names = T)
-file_ls <- list()
-for(file in files){
-  load(file)
-  nm <- gsub('.RData', '', basename(file))
-  cat(nm, '\t')
-  tmp <- get(nm)
-  file_ls[[nm]] <- tmp
-  }
-
-daily_do <- adply(
-  file_ls, 1, 
-  function(x) {
-    x$jday <- format(x$DateTimeStamp, '%j')
-    out <- ddply(x,
-      .variable = 'jday',
-      .fun = function(y){
-        if(sum(is.na(y$DO_mgl)) == length(y$DO_mgl)) NA
-        else {
-          rng <- diff(c(min(y$DO_mgl, na.rm = T), 
-            max(y$DO_mgl, na.rm = T)))
-          avg <- mean(y$DO_mgl, na.rm = T)
-          c(rng, avg)
-          }
-        }
-      )
-    colMeans(out[, -1], na.rm = T)
-    }, 
-  .progress = 'tk'
-  )
-names(daily_do) <- c('site', 'daily_rng', 'daily_avg')
-
-##
-# get metab summaries
-
-# metab data
-load('M:/wq_models/SWMP/raw/rproc/dat_nem.RData')
-
-met_sum <- adply(matrix(cases, ncol = 1),
-  1,
-  .fun = function(x){
-    
-    met <- dat.nem[[x]][, c('Pg', 'Rt', 'NEM')]
-    colMeans(met, na.rm = T)
-     
-    }
-  )
-met_sum$X1 <- NULL
-met_sum$site <- cases
-
-##
-# combine data 
-# tide_comps, daily_do, met_sum
-
-to_tab <- cbind(tide_comps, daily_do, met_sum)
-to_tab <- to_tab[, !names(to_tab) %in% 'site']
 
 
