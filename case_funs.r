@@ -1233,37 +1233,56 @@ dec_fun <- function(dat_in, var_nm = 'DateTimeStamp'){
   }
 
 ######
-# function for getting regression weights, only one vector
+# function for getting regression weights
 # note that this subsets the input data frame for faster wt selection
 # subset is by limiting window for product of weights (dec_time)
 # subsetted weights are recombined to equal vector of length = nrow(dat_in)
+# input weights are whole window, halved within function, dec_time in days and tide height
+# default window for tide height is whole range (value as 1) 
 #'wt_vars' is name of three variables to weight
 #'ref_in' is row of dat.in that is used as reference
 #'dat_in' is data to get weights from
-#'wins' are the windows for the three wt.vars, values represent halves
+#'wins' are the windows for the two wt.vars
 #'all' will return all weights, rather than the product of all three
 #'slice' is logical for subsetting 'dat_in' for faster wt selection
 #'subs_only' is logical for returning only wt vectors that are non-zero
 wt_fun <- function(ref_in, dat_in,
-  win,
-  wt_var = 'dec_time',
-  slice = T, 
+  wt_vars = c('dec_time', 'Tide'),
+  wins = list(10, 1),
   all = F, 
+  slice = T, 
   subs_only = F){
   
-  # sanity check
-  if(sum(wt_var %in% names(dat_in)) != length(wt_var))
+  # sanity check for wt_vars
+  if(sum(wt_vars %in% names(dat_in)) != length(wt_vars))
     stop('Weighting variables must be named in "dat_in"')
   
+  # windows for each variable
+  wins_1<-wins[[1]]/365/2
+  wins_2 <- wins[[2]] * diff(range(dat_in[, wt_vars[2]]))/2
+    
   # weighting tri-cube function
+  # mirror extends weighting function if vector repeats, e.g. monthly
   # 'dat_cal' is observation for weight assignment
   # 'ref' is reference observation for fitting the model
   # 'win' is window width from above (divided by two)
   # 'mirr' is logical indicating if distance accounts for repeating variables (e.g., month)
-  wt_fun_sub <- function(dat_cal, ref, win){
+  # 'scl_val' is range for the ref vector of obs, used to get correct distance for mirrored obs
+  wt_fun_sub <- function(dat_cal, ref, win, mirr = F, scl_val = 1){
     
     # dist_val is distance of value from the ref
     dist_val <- sapply(ref, function(x) abs(dat_cal - x))
+    
+    # repeat if distance is checked on non-continuous number line
+    if(mirr){
+      
+        dist_val <- pmin(
+          sapply(ref, function(x) abs(x + scl_val - dat_cal)),
+          sapply(ref, function(x) abs(dat_cal + scl_val - x)),
+          dist_val
+          )
+      
+      }
     
     # get wts within window, otherwise zero
     win_out <- dist_val > win
@@ -1275,11 +1294,9 @@ wt_fun <- function(ref_in, dat_in,
     }
 
   #reference (starting) data
-  ref_1 <- as.numeric(ref_in[, wt_var])
+  ref_1 <- as.numeric(ref_in[, wt_vars[1]])
+  ref_2 <- as.numeric(ref_in[, wt_vars[2]])
 
-  # window width
-  wins_1 <- win/365
-  
   ##
   # subset 'dat_in' by max window size for faster calc
   # this is repeated if min number of wts > 0 is not met
@@ -1296,22 +1313,26 @@ wt_fun <- function(ref_in, dat_in,
   # weights for each observation in relation to reference
   # see comments for 'wt_fun_sub' for 'scl_val' argument
   
-  # dec_time weights
-  wts_1 <- wt_fun_sub(as.numeric(dat_sub[, wt_var]), 
-    ref = ref_1, win = wins_1) 
-
+  # dec_time
+  wts_1 <- wt_fun_sub(as.numeric(dat_sub[, wt_vars[1]]), 
+    ref = ref_1, win = wins_1, mirr = F) 
+  # tide
+  wts_2 <- wt_fun_sub(as.numeric(dat_sub[, wt_vars[2]]), 
+    ref = ref_2, win = wins_2, mirr = F)
+  
   # all as product 
-  out <- wts_1
+  out <- sapply(1:nrow(ref_in), function(x) wts_1[, x] * wts_2[, x])
   
   gr_zero <- colSums(out > 0)
   #cat('   Number of weights greater than zero =',gr.zero,'\n')
   
-  # extend window widths of weight vector is less than 100
-  while(any(gr_zero < 100)){
+  # extend window widths of weight vector if less than 50
+  while(any(gr_zero < 50)){
     
     # increase window size by 10%
     wins_1 <- 1.1 * wins_1
-
+    wins_2 <- 1.1 * wins_2
+    
     # subset again
     dec_sub <- with(dat_in, 
       dec_time > ref_time - wins_1 * 5 & dec_time < ref_time + wins_1 * 5
@@ -1320,10 +1341,13 @@ wt_fun <- function(ref_in, dat_in,
     dat_sub <- dat_in[dec_sub, ]
     
     #weights for each observation in relation to reference
-    wts_1 <- wt_fun_sub(as.numeric(dat_sub[, wt_var]), 
-      ref = ref_1, win = wins_1)
+    wts_1 <- wt_fun_sub(as.numeric(dat_sub[, wt_vars[1]]), 
+      ref = ref_1, win = wins_1, mirr = F)
+    wts_2 <- wt_fun_sub(as.numeric(dat_sub[, wt_vars[2]]), 
+      ref = ref_2, win = wins_2, mirr = F)
     
-    out <- wts_1
+    out <- sapply(1:nrow(ref_in), 
+      function(x) wts_1[, x] * wts_2[, x])
     
     gr_zero <- colSums(out > 0)
     
@@ -1352,16 +1376,22 @@ wt_fun <- function(ref_in, dat_in,
     out[dec_sub,] <- wts_in
     out
     }
+  wts_1 <- empty_fill(wts_1)
+  wts_2 <- empty_fill(wts_2)
   out <- empty_fill(out)
-
-  # return all weights if T
+  
+  # rescale final output to 0 -- 1
+  out <- out/max(out, na.rm = T)
+  
+  #return all weights if T
   if(all){
-    out <- data.frame(dat_in$DateTimeStamp, out)
-    names(out) <- c('DateTimeStamp', 'wts')
+    out <- data.frame(dat_in$DateTimeStamp, 
+      wts_1, wts_2, out)
+    names(out) <- c('DateTimeStamp', wt_vars, 'final')
     return(out)
     }
   
-  # return only the weight vector
+  #final
   out
   
   }
@@ -1442,10 +1472,11 @@ filled.contour.hack <- function (x = seq(0, 1, length.out = nrow(z)), y = seq(0,
 
 ######
 # get predicted, normalized values not using interp grid, tide as predictor
+# wins are whole window widths, not halves, number of days and tidal height
 # 'dat_in' is raw data used to create 'grd_in' and used to get predictions
 # 'DO_obs' is string indicating name of col for observed DO values from 'dat_in'
 # output is data frame same as 'dat_in' but includes predicted and norm columns
-wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', win = 10,
+wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', wins = list(10, 1),
   parallel = F, progress = F){
 
   # get mean tidal height from empirical data
@@ -1456,7 +1487,7 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', win = 10,
   
   out <- ddply(dat_in, 
     .variable = 'DateTimeStamp',
-    .parallel = parallel,
+    .parallel = parallel, 
     .fun = function(row){
       
       # row for prediction
@@ -1475,7 +1506,8 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', win = 10,
         }
       
       # get wts
-      ref_wts <- wt_fun(ref_in, dat_in, win = win, subs_only = T)
+      ref_wts <- wt_fun(ref_in, dat_in, wins = wins, slice = T, 
+        subs_only = T, wt_vars = c('dec_time', 'Tide'))
   
       #OLS wtd model
       out <- lapply(1:length(ref_wts),
@@ -1483,38 +1515,35 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', win = 10,
           
           # subset data for weights > 0
           dat_proc <- dat_in[as.numeric(names(ref_wts[[x]])),]
-     
+          
           # if no DO values after subset, return NA
           # or if observed DO for the row is NA, return NA
           if(sum(is.na(dat_proc$DO_obs)) == nrow(dat_proc)|
-            any(is.na((ref_in$DO_obs)))){
-          
-            DO_prd <- NA
+              any(is.na((ref_in$DO_obs)))){
+            
+            DO_pred <- NA
             Tide <- ref_in$Tide[x]
-          
+            
             } else {
-          
-              # subset weigths > 0, rescale weights average
-              ref_wts <- ref_wts[[x]]/mean(ref_wts[[x]])
-          
+            
               # get model
               mod_md <- lm(
                 DO_obs ~ dec_time + Tide,
-                weights = ref_wts,
+                weights = ref_wts[[x]],
                 data = dat_proc
                 )
-          
+            
               # get prediction from model
               Tide <- ref_in$Tide[x]
-              DO_prd <- predict(
+              DO_pred <- predict(
                 mod_md, 
                 newdata = data.frame(dec_time = ref_in$dec_time[x], Tide = Tide)
                 )
+            
+            }
           
-              }
-          
-            # output
-            DO_prd
+          # output
+          DO_pred
           
           }
         
@@ -1528,10 +1557,10 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', win = 10,
   
   out$DateTimeStamp <- NULL
   out <- cbind(dat_in, out)
-  
+
   # DO_est is normalized plus resid
   out$DO_dtd <- with(out, DO_nrm + DO_obs - DO_prd)
-
+  
   return(out)
   
   }
@@ -1698,7 +1727,7 @@ prep_wtreg <- function(site_in,
   
   # remove extra cols
   to_rm <- c('SpCond', 'DO_pct', 'cDepth', 'pH', 'Turb', 'ChlFluor',
-    'RH', 'Wdir', 'SDWDir', 'TotPAR', 'TotPrcp', 'CumPrcp', 'TotSoRad', 
+    'RH', 'Wdir', 'SDWDir', 'TotPrcp', 'CumPrcp', 'TotSoRad', 
     'PO4H', 'NH4F', 'NO2F', 'NO3F', 'NO23F', 'CHLA_N', 'flag')
   to_proc <- to_proc[, !names(to_proc) %in% to_rm]
   

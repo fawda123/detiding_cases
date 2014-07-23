@@ -353,36 +353,9 @@ grid.arrange(p1, p2, ncol = 1)
 dev.off()
 
 ######
-
-# DO boxplots by tidal quantile by site
-cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
-dat <- vector('list', length = length(cases))
-names(dat) <- cases
-for(case in cases){
-  load(paste0(case, '_wtreg.RData'))
-  dat[[case]] <- data.frame(case = case, get(paste0(case, '_wtreg')))
-  }
-dat <- llply(dat, 
-  .fun = function(x){
-    tide_quants <- quantile(x$Tide, probs = seq(0, 1, by = 0.25))
-    x$Tide_q <- cut(x$Tide, tide_quants)
-    x$Tide_q <- factor(x$Tide_q, levels = levels(x$Tide_q), 
-      labels = seq(1, length(levels(x$Tide_q))))
-    x
-    }
-  )
-dat <- do.call('rbind', dat)
-dat <- na.omit(melt(dat, id.vars = c('case', 'Tide_q'), 
-  measure.vars = c('DO_dtd', 'DO_obs')))
-
-ggplot(dat, aes(x = Tide_q, y = value, fill = variable)) + 
-  geom_boxplot() + 
-  facet_wrap(~case, scales = 'free_y')
-
-##
 # scatterplots of DO with tide using obs and dtd by month
 
-cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
+cases <- c('ELKVM', 'PDBBY', 'RKBMB', 'SAPDC')
 
 dat <- vector('list', length = length(cases))
 names(dat) <- cases
@@ -403,35 +376,17 @@ to_plo <- melt(to_plo, id.var = c('L1', 'Month', 'Tide'),
   measure.var = c('DO_obs', 'DO_dtd'))
 
 to_plo <- to_plo#[sample(1:nrow(to_plo), 50000, replace = F), ]
+y_lab <- expression(paste('DO mg ', L^-1))
+pdf('C:/Users/mbeck/Desktop/do_cors.pdf', family = 'serif', 
+  height = 7, width = 10)
 ggplot(to_plo, aes(x = Tide, y = value, colour = variable)) + 
-  geom_point(size = 0.1, alpha = 0.5) +
+  geom_point(size = 0.5, alpha = 0.8) +
   stat_smooth(method = 'lm', colour = 'black') + 
   facet_grid(L1 + variable ~ Month, scales = 'free_y') + 
-  theme_bw()
-
-
-# ccf plots between tide and DO before/after detiding
-cases <- c('PDBJE', 'RKBMB', 'SAPDC', 'TJRBR')
-dat <- vector('list', length = length(cases))
-names(dat) <- cases
-for(case in cases){
-  load(paste0(case, '_wtreg.RData'))
-  dat[[case]] <- data.frame(case = case, get(paste0(case, '_wtreg')))
-  }
-pdf('C:/Users/mbeck/Desktop/cors_bf.pdf', height = 5,  width = 6,
-  family = 'serif')
-for(i in 1:length(dat)){
-
-    x <- dat[[i]]
-    nm <- names(dat)[i]
-  
-    par(mfrow = c(2, 1), mar = c(4.5,4.5, 3, 1))
-    with(x, ccf(Depth, DO_obs, na.action = na.pass, main = nm))
-    with(x, ccf(Depth, DO_dtd, na.action = na.pass))
-
-    }
+  theme_bw() +
+  theme(legend.position = 'none') +
+  ylab(y_lab)
 dev.off()
-
 
 ######
 # quantify correlatoin of tide w/ DO for all sites
@@ -497,5 +452,5 @@ par(mfrow = c(3, 1))
 plot(DO_mgl ~ DateTimeStamp,  x[subs,], type = 'l')  
 plot(Tide ~ DateTimeStamp, x[subs, ], type = 'l')
 plot(Depth ~ DateTimeStamp, x[subs, ], type = 'l')
-
-
+  
+  

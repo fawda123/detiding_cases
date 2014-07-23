@@ -28,46 +28,54 @@ source('case_funs.r')
 cases <- c('ELKVM','PDBBY', 'RKBMB', 'SAPDC')
 
 # setup parallel backend
-cl <- makeCluster(4)
+cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
 strt <- Sys.time()
+day_wins <- c(5, 10, 15, 20, 25, 30, 35, 40)
+tide_wins <- c(0.5, 1, 5)
 
-# windows to check
-wins <- c(0.25, 0.5, 1, 2, 5)
+case_grds <- expand.grid(day_wins, tide_wins)
+names(case_grds) <- c('Day', 'Tide')
 
 # do w/ tide, subset by year
-foreach(case = cases) %dopar% {
-   
+for(case in cases){
+    
+  # prep input
   to_proc <- prep_wtreg(case)
   yr_sel <- as.numeric(format(to_proc$DateTimeStamp, '%Y'))
   yr_sel <- yr_sel %in% 2012
   to_proc <- to_proc[yr_sel, ]
   
-  # iterate through window lenghts
-  for(i in wins){
-  # get pred, norm
-  
-    wtreg <- wtreg_fun(to_proc, win = i)
+  #iterate through window grids
+  foreach(i = 1:nrow(case_grds)) %dopar% {
   
     # progress
     sink('log.txt')
     cat('Log entry time', as.character(Sys.time()), '\n')
-    cat('window', i, which(case == cases), 'of', length(cases), '\n')
+    cat('row', i, 'case', which(case == cases), 'of', length(cases), '\n')
     print(Sys.time() - strt)
     sink()
     
+    # windows in case_grds
+    wins_in <- list(case_grds[i, 1], case_grds[i, 2])
+    
+    # get pred, norm
+    wtreg <- wtreg_fun(to_proc, wins = wins_in)
+
     # save results
-    wtreg_nm <- paste0(case, '_wtreg') 
+    wtreg_nm <- paste(case, 'wtreg', i, sep ='_') 
     assign(wtreg_nm, wtreg)
     save(
       list = wtreg_nm,
-      file=paste(case, which(i == wins), 'wtreg.RData', sep = '_')
+      file=paste(case, '_wtreg_', i, '.RData', sep = '')
       )
 
-  # clear RAM
-  rm(list = wtreg_nm)
+    # clear RAM
+    rm(list = wtreg_nm)
+    
+    }
   
   }
 stopCluster(cl)
@@ -77,11 +85,13 @@ stopCluster(cl)
 # one element per site, contains both metab ests in the same data frame
 
 # setup parallel backend
-cl <- makeCluster(4)
+cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # start time
 strt <- Sys.time()
+
+cases <- list.files(path = getwd(), pattern = '_wtreg_')
 
 # metab ests as list
 met_ls <- foreach(case = cases) %dopar% {
@@ -94,13 +104,16 @@ met_ls <- foreach(case = cases) %dopar% {
   sink()
   
   # get data for eval
-  nm <- paste0(case, '_wtreg')
-  load(paste0(nm, '.RData'))
+  load(case)
+  nm <- gsub('.RData', '', case)
+  stat <- gsub('_wtreg_[0-9]+$', '', nm)
   dat_in <- get(nm)
   
   # get metab for obs DO
-  met_obs <- nem.fun(dat_in, stat = case, DO_var = 'DO_obs')
-  met_dtd <- nem.fun(dat_in, stat = case, DO_var = 'DO_dtd')
+  met_obs <- nem.fun(dat_in, stat = stat, 
+    DO_var = 'DO_obs')
+  met_dtd <- nem.fun(dat_in, stat = stat, 
+    DO_var = 'DO_dtd')
   
   # combine results
   col_sel <- c('Pg', 'Rt', 'NEM')
@@ -109,8 +122,8 @@ met_ls <- foreach(case = cases) %dopar% {
   names(met_dtd) <- c('Pg_dtd', 'Rt_dtd', 'NEM_dtd')
   met_out <- cbind(met_obs, met_dtd)
 
-  # return results (first row is last day of 2011)
-  met_out[-1, ]
+  # return results
+  met_out
 
   }
 stopCluster(cl)
@@ -122,7 +135,7 @@ save(met_ls, file = 'met_ls.RData')
 # calculate instantaneous flux rates
 
 # setup parallel backend
-cl <- makeCluster(4)
+cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # start time
@@ -139,13 +152,16 @@ met_ls_inst <- foreach(case = cases) %dopar% {
   sink()
   
   # get data for eval
-  nm <- paste0(case, '_wtreg')
-  load(paste0(nm, '.RData'))
+  load(case)
+  nm <- gsub('.RData', '', case)
+  stat <- gsub('_wtreg_[0-9]+$', '', nm)
   dat_in <- get(nm)
   
-  # get metab for obs DO
-  met_obs <- inst.flux.fun(dat_in, stat = case, DO_var = 'DO_obs')
-  met_dtd <- inst.flux.fun(dat_in, stat = case, DO_var = 'DO_dtd')
+  # get inst DOF for obs and dtd
+  met_obs <- inst.flux.fun(dat_in, stat = stat, 
+    DO_var = 'DO_obs')
+  met_dtd <- inst.flux.fun(dat_in, stat = stat, 
+    DO_var = 'DO_dtd')
   
   # combine results, DOF corrects for air-sea xchange
   DOF_obs <- with(met_obs, DOF - D)
@@ -153,10 +169,11 @@ met_ls_inst <- foreach(case = cases) %dopar% {
   DOF_dtd <- with(met_dtd, DOF - D)
   D_dtd <- with(met_dtd, D)
 
-  met_out <- data.frame(met_obs[, 1:17], DOF_obs, D_obs, DOF_dtd, D_dtd)
+  rm_col <- !names(met_obs) %in% c('D', 'DOF')
+  met_out <- data.frame(met_obs[, rm_col], DOF_obs, D_obs, DOF_dtd, D_dtd)
   
-  # return results (first row is last day of 2011)
-  met_out[-1, ]
+  # return results
+  met_out
 
   }
 stopCluster(cl)
