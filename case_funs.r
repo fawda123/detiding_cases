@@ -1286,7 +1286,8 @@ wt_fun <- function(ref_in, dat_in,
     
     # get wts within window, otherwise zero
     win_out <- dist_val > win
-    dist_val <- (1 - (dist_val/win)^3)^3
+#     dist_val <- (1 - (dist_val/win)^3)^3
+    dist_val[!win_out] <- 1
     dist_val[win_out] <- 0
       
     return(dist_val)
@@ -1703,10 +1704,12 @@ get_map_meta <- function(val_in){
 # 'wq_path' is character of path for wq files
 # 'tide_path' is character of path for tidal prediction files
 # 'DO_var' is character of name of column with DO, renamed as 'DO_obs'
+# 'interp' is logical indicating if missing DO values are interpolated, max gap is four hours
 prep_wtreg <- function(site_in, 
   wq_path = 'M:/wq_models/SWMP/raw/rproc/proc5/',
   tide_path = 'M:/wq_models/SWMP/raw/rproc/tide_preds/',
-  DO_var = 'DO_mgl'){
+  DO_var = 'DO_mgl',
+  interp = T){
   
   # load wq data
   load(paste0(wq_path, site_in, '.RData'))
@@ -1733,6 +1736,13 @@ prep_wtreg <- function(site_in,
   
   # reassign name for DO_var
   names(to_proc)[names(to_proc) %in% DO_var] <- 'DO_obs'
+  
+  # interp missing values using max gap of four hours (8 obs)
+  # na.rm = F keeps leading and trailing NA vals
+  if(interp)
+    to_proc$DO_obs <- with(to_proc, 
+      na.approx(DO_obs, x = DateTimeStamp, maxgap = 8, na.rm = F)
+      )
   
   return(to_proc)
     

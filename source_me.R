@@ -33,11 +33,12 @@ registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
 strt <- Sys.time()
-day_wins <- c(5, 10, 15, 20, 25, 30, 35, 40)
-tide_wins <- c(0.5, 1, 5)
+day_wins <- c(1, 2, 4, 6, 10, 15, 20, 25, 30, 40)
+tide_wins <- c(0.1, 0.25, 0.5, 1, 5)
 
 case_grds <- expand.grid(day_wins, tide_wins)
 names(case_grds) <- c('Day', 'Tide')
+save(case_grds, file = 'case_grds.RData')
 
 # do w/ tide, subset by year
 for(case in cases){
@@ -180,3 +181,4 @@ stopCluster(cl)
 
 names(met_ls_inst) <- cases
 save(met_ls_inst, file = 'met_ls_inst.RData')
+
