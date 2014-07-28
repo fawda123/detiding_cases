@@ -1286,8 +1286,8 @@ wt_fun <- function(ref_in, dat_in,
     
     # get wts within window, otherwise zero
     win_out <- dist_val > win
-#     dist_val <- (1 - (dist_val/win)^3)^3
-    dist_val[!win_out] <- 1
+    dist_val <- (1 - (dist_val/win)^3)^3
+#     dist_val[!win_out] <- 1
     dist_val[win_out] <- 0
       
     return(dist_val)

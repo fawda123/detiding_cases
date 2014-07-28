@@ -33,8 +33,8 @@ registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
 strt <- Sys.time()
-day_wins <- c(1, 2, 4, 6, 10, 15, 20, 25, 30, 40)
-tide_wins <- c(0.1, 0.25, 0.5, 1, 5)
+day_wins <- c(1, 2, 5, 10, 15, 30, 45, 60)
+tide_wins <- c(0.25, 0.5, 1, 2)
 
 case_grds <- expand.grid(day_wins, tide_wins)
 names(case_grds) <- c('Day', 'Tide')
