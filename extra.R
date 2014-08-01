@@ -114,9 +114,9 @@
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
 cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
 
-# subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
-subs <- c(100000:200000)
-subs <- list(subs, subs, subs, subs)
+subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
+# subs <- c(1:100000)
+# subs <- list(subs, subs, subs, subs)
 
 # get tidal summaries
 files <- list.files('M:/wq_models/SWMP/raw/rproc/tide_preds/', 
@@ -127,9 +127,8 @@ for(file in files){
   load(file)
   nm <- gsub('.RData', '', basename(file))
   cat(nm, '\t')
-  tmp <- get(nm)[as.numeric(format(get(nm)$DateTimeStamp, '%Y')) == 2010
-    & as.numeric(format(get(nm)$DateTimeStamp, '%m')) == 6,]#subs[[which(file == files)]], ]
-#   tmp$row <- subs[[which(file == files)]]
+  tmp <- get(nm)[subs[[which(file == files)]], ]
+  tmp$row <- subs[[which(file == files)]]
   file_ls[[nm]] <- tmp
   }
 
@@ -143,7 +142,7 @@ p1 <- ggplot(to_plo1, aes(x = DateTimeStamp, y = Tide,
     colour = L1)) + 
   geom_line() + 
   facet_wrap(~L1, scales = 'free_x', ncol = 1) + 
-  scale_x_datetime(name=element_blank()) + 
+  scale_x_continuous(name=element_blank()) + 
   theme_bw() +
   theme(legend.position = 'none')
 
@@ -157,10 +156,8 @@ for(file in files){
   load(file)
   nm <- gsub('.RData', '', basename(file))
   cat(nm, '\t')
-  tmp <- get(nm)[as.numeric(format(get(nm)$DateTimeStamp, '%Y')) == 2010 &
-      as.numeric(format(get(nm)$DateTimeStamp, '%m')) == 6,c('DateTimeStamp', 'DO_mgl')]
-#     subs[[which(file == files)]], c('DateTimeStamp', 'DO_mgl')]
-#   tmp$row <- subs[[which(file == files)]]
+  tmp <- get(nm)[subs[[which(file == files)]], c('DateTimeStamp', 'DO_mgl')]
+  tmp$row <- subs[[which(file == files)]]
   file_ls[[nm]] <- tmp
   }
 
@@ -171,7 +168,7 @@ p2 <- ggplot(to_plo2, aes(x = DateTimeStamp, y = DO_mgl,
     colour = L1)) + 
   geom_line() + 
   facet_wrap(~L1, scales = 'free_x', ncol = 1) + 
-  scale_x_datetime(name=element_blank()) + 
+  scale_x_continuous(name=element_blank()) + 
   theme_bw()  +
   theme(legend.position = 'none')
 
@@ -214,8 +211,7 @@ print(p3)
 
 # low do/high tide, high do/low tide, low do/low tide, high do/low tide
 cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
-pdf('C:/Users/mbeck/Desktop/exs.pdf', height = 8, width = 10, family = 'serif')
-for(case in cases){
+case <- cases[2]
 
 load(paste0(case, '_prdnrm_td.RData'))
 load(paste0(case, '_intgrd_td.RData'))
@@ -229,51 +225,42 @@ int_grd <- get(paste0(case, '_intgrd_td'))
 # prdnrm <- get(paste0(case, '_prdnrm_dtd'))
 # int_grd <- get(paste0(case, '_intgrd_dtd'))
 
-subs <- 1:nrow(prdnrm)
+subs <- 7000:8000
 
 to_plo <- prdnrm[subs,]
 to_plo <- met.day.fun(to_plo, case)
 to_plo$sunrise <- factor(to_plo$variable, levels = c('sunrise', 'sunset'), 
   labels = c('DO_nrm, day', 'DO_nrm, night'))
 
-fmt <- function(){
-    function(x) format(x, digits = 2)
-}
-
 p1 <- ggplot(to_plo, aes(x = DateTimeStamp, y = DO_obs, colour = 'DO_obs')) + 
   geom_line() +
-  geom_line(aes(y = DO_pred, colour = 'DO_pred'), size = 1) +
-  geom_line(aes(y = DO_nrm, colour = sunrise, group = 1), size = 1) +
-  scale_y_continuous(labels = fmt()) +
+  geom_line(aes(y = DO_pred, colour = 'DO_pred'), size = 2) +
+  geom_line(aes(y = DO_nrm, colour = sunrise, group = 1), size = 2) +
+#   scale_y_continuous(limits = c(10, 14)) +
   theme_bw() + 
-  theme(legend.title = element_blank(), legend.position = 'top') +
-  ggtitle(case)
+  theme(legend.title = element_blank(), legend.position = 'top')
 
-p2 <- ggplot(to_plo, aes(x = DateTimeStamp, y = Tide, group = 1, 
-  colour = 'Predicted tide')) + 
+p2 <- ggplot(to_plo, aes(x = DateTimeStamp, y = Tide, colour = sunrise, group = 1)) + 
   geom_line() +
-#   geom_line(aes(y = dTide)) +
-  geom_line(aes(y = Depth, colour = 'Observed height'), size = 1) +
-  scale_y_continuous(labels = fmt()) +
+  geom_line(aes(y = dTide)) +
+  geom_point(aes(y = Depth)) +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = 'top')
 
 sim_grd <- int_grd[subs[1]:(10*subs[length(subs)]),]
 
-p3 <- ggplot(sim_grd, aes(x = DateTimeStamp, y = Tide, 
+p3 <- ggplot(sim_grd, aes(x = DateTimeStamp, y = factor(round(Tide,1)), 
     z = DO_pred, fill = DO_pred)) +
   geom_tile() + 
   scale_fill_gradientn(colours=cm.colors(3)) +
   scale_x_datetime(expand = c(0,0)) + 
-  scale_y_continuous(expand = c(0,0), labels = fmt()) +
+  scale_y_discrete(expand = c(0,0)) +
   ylab('Tide') +
   theme_bw() +
   theme(legend.title = element_blank(), legend.position = 'top')
 
 grid.arrange(p1, p2, p3, ncol = 1)
 
-}
-dev.off()
 # get metabs
 met_subs <- 1:nrow(prdnrm)
 dat_met_obs <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_obs')
@@ -319,11 +306,11 @@ names(met_ls) <- cases
 
 for(case in cases){
 
-  load(paste0(case, '_prdnrm_dtd.RData'))
-  load(paste0(case, '_intgrd_dtd.RData'))
+  load(paste0(case, '_prdnrm_td.RData'))
+  load(paste0(case, '_intgrd_td.RData'))
   
-  prdnrm <- get(paste0(case, '_prdnrm_dtd'))
-  int_grd <- get(paste0(case, '_intgrd_dtd'))
+  prdnrm <- get(paste0(case, '_prdnrm_td'))
+  int_grd <- get(paste0(case, '_intgrd_td'))
   
   # get metabs
   dat_met_obs <- nem.fun(prdnrm, case, DO_var = 'DO_obs')
@@ -340,95 +327,17 @@ for(case in cases){
     
   }
 
-met_ls_dtd <- met_ls
+tmp <- llply(met_ls, melt)
 
-# add cat variable for anom v non-anom
-to_plo <- llply(met_ls_dtd, 
-  .fun = function(x) {
-    
-    x$Pg_cats <- 'Regs'
-    x$Pg_cats[x$Pg < 0] <- 'Anom'
-    x$Pg_cats[is.na(x$Pg)] <- NA
-    x$Rt_cats <- 'Regs'
-    x$Rt_cats[x$Rt > 0] <- 'Anom'
-    x$Rt_cats[is.na(x$Rt)] <- NA
-    
-    Pg_out <- na.omit(summarySE(
-      x, measurevar = 'Pg', groupvars = c('L1', 'Pg_cats'))
-      )
-    names(Pg_out)[names(Pg_out) %in% c('L1','Pg', 'Pg_cats')] <- c('DO_typ', 'met_cat', 'mean')
-    Pg_out$var <- 'Pg'
-    Rt_out <- na.omit(
-      summarySE(x, measurevar = 'Rt', groupvars = c('L1', 'Rt_cats'))
-      )
-    names(Rt_out)[names(Rt_out) %in% c('L1','Rt', 'Rt_cats')] <- c('DO_typ', 'met_cat', 'mean')
-    Rt_out$var <- 'Rt'
-    
-    rbind(Pg_out, Rt_out)
-      
-    }
-  )
+to_plo <- melt(res_ls)
+to_plo$L2 <- factor(to_plo$L2, levels = c('1','2','3'),
+  labels = c('DO_obs', 'DO_prd', 'DO_nrm'))
+to_plo$met <- rep(c('percent', 'Mean anom', 'Mean regs'), rep = 24)
 
-to_plo <- melt(to_plo, id.var = names(to_plo[[1]]))
-to_plo$DO_typ <- factor(to_plo$DO_typ, levels = c('obs', 'prd', 'nrm'), 
-  labels = c('Obs', 'Prd', 'Nrm'))
+ggplot(to_plo, aes(x = variable, y = value, fill = L2)) +
+    geom_bar(stat = 'identity', position = 'dodge') + 
+    facet_grid(met ~ L1)
 
-to_eval <- llply(met_ls, 
-  .fun = function(x) {
-    
-    x$Pg_cats <- 'Regs'
-    x$Pg_cats[x$Pg < 0] <- 'Anom'
-    x$Pg_cats[is.na(x$Pg)] <- NA
-    x$Rt_cats <- 'Regs'
-    x$Rt_cats[x$Rt > 0] <- 'Anom'
-    x$Rt_cats[is.na(x$Rt)] <- NA
-    
-    Pg_test <- TukeyHSD(aov(Pg ~ Pg_cats * L1, data = x))
-    Rt_test <- TukeyHSD(aov(Rt ~ Rt_cats * L1, data = x))
-
-    list(Pg = Pg_test, Rt = Rt_test)
-      
-    }
-  )
-
-# metab summary
-ggplot(to_plo, aes(x = met_cat, y = mean, fill = DO_typ)) +  
-  geom_bar(stat = 'identity', position = position_dodge(.9)) + 
-  geom_errorbar(position = position_dodge(.9), width=.25, 
-    aes(ymin = mean - sd, ymax = mean + sd)) +
-  facet_grid(var ~ L1) +
-  theme_bw() +
-  theme(legend.title = element_blank())
-
-# metab_all
-to_plo2 <- do.call('rbind', met_ls_td)
-to_plo2 <- melt(to_plo2, id.var = c('Station', 'Date', 'L1'),
-  measure.var = c('NEM', 'Pg', 'Rt'))
-names(to_plo2)[names(to_plo2) %in% c('L1')] <- 'DO_typ'
-to_plo2$DO_typ <- factor(to_plo2$DO_typ, levels = c('obs', 'prd', 'nrm'), 
-  labels = c('Obs', 'Prd', 'Nrm'))
-
-ggplot(to_plo2, aes(x = Date, y = value, group = variable, 
-  colour = variable)) +
-  geom_line() +
-  facet_wrap(DO_typ ~ Station, scales = 'free_y') +
-  theme_bw()
-
-to_plo3 <- to_plo2
-year <- as.numeric(format(to_plo3$Date, '%Y'))
-week <- as.numeric(format(to_plo3$Date, '%W'))/53
-to_plo3$dec_time <- year + week
-
-to_plo3 <-ddply(to_plo3, 
-  .variable = c('Station', 'DO_typ', 'variable','dec_time'), 
-  .fun = function(x) mean(x$value, na.rm = T)
-  )
-
-ggplot(to_plo3, aes(x = dec_time, y = V1, group = variable, 
-  colour = variable)) +
-  geom_line() +
-  facet_wrap(DO_typ ~ Station, scales = 'free_y') +
-  theme_bw()
 
 ######
 #
@@ -470,94 +379,130 @@ ggplot(int_grd, aes(x = DateTimeStamp, y = DO_pred, group = Tide,
   theme_bw()
 
 ######
-# make interp_grd faster
+# weekly, monthly, seasonal aggregations of metab estimates
 
-interp_td_grd_dt <- function(dat_in, tide_div = 10,
-  wins = list(4, 12, NULL), progress = F){
-  
-  dat_in <- data.table(dat_in, key = 'DateTimeStamp')
-  
-  # setup range of tidal vals to predict for grid
-  tide.grid<-seq(min(dat_in$Tide), max(dat_in$Tide), length = tide_div)
-  
-  # expand dat_in for interp
-  dat_int <- dat_in[, {
-    
-    # row for prediction, dat_in in this context is one row
-    ref_in <- dat_in
-    ref_in <- ref_in[rep(1, tide_div),]
-    ref_in$Tide <- tide.grid
-    
-    my_col <- names(ref_in)[!names(ref_in) %in% 'DateTimeStamp']
-    ref_in[, my_col, with = F]
-    
-    }, key = 'DateTimeStamp']
+load('PDBBY_intgrd_td.RData')
+load('PDBBY_prdnrm_td.RData')
+grd_tmp <- PDBBY_intgrd_td
+prd_tmp <- PDBBY_prdnrm_td
 
-  # convert dat_in back to data.frame for wt_fun
-  dat_in <- data.frame(dat_in)
+met_obs <- nem.fun(prd_tmp, 'PDBBY', 'DO_obs')
+met_dtd <- nem.fun(prd_tmp, 'PDBBY', 'DO_nrm')
+
+# combine results
+col_sel <- c('Pg', 'Rt', 'NEM')
+met_obs <- met_obs[, c('Station', 'Date', 'Tide', col_sel)]
+met_dtd <- met_dtd[, col_sel]
+names(met_dtd) <- c('Pg_dtd', 'Rt_dtd', 'NEM_dtd')
+met_out <- cbind(met_obs, met_dtd)
+
+nem_agg_fun <- function(nem_in){
   
-  int_out <- dat_int[, {
-    
-    ref_in <- dat_int
-    
-    # get wts
-    ref_wts <- wt_fun(data.frame(ref_in), dat_in, wins = wins, slice = T, 
-      subs_only = T, wt_vars = c('dec_time', 'hour', 'Tide'))
-  
-    #OLS wtd model
-    out <- lapply(1:length(ref_wts),
-      function(x){
-        
-        # subset data for weights > 0
-        dat_proc <- dat_in[as.numeric(names(ref_wts[[x]])),]
-        
-        # if no DO values after subset, return NA
-        # or if observed DO for the row is NA, return NA
-        if(sum(is.na(dat_proc$DO_obs)) == nrow(dat_proc)|
-            any(is.na((ref_in$DO_obs)))){
+  met_sub <- llply(nem_in, 
+    .fun = function(x){
+      
+      # add week, month cols
+      x$week <- format(x$Date, '%W')
+      x$month <- format(x$Date, '%m')
+      
+      # seas col
+      x$seas <- car::recode(x$month, "c('01','02','03') = 'W'; 
+        c('04','05','06') = 'Sp'; 
+        c('07','08','09') = 'Su'; 
+        c('10','11','12') = 'F'")
+      
+      x
+      
+    })
+
+  # aggregate by weekly, monthly, seasonal categories
+  # for each case...
+  agg_sum <- llply(met_sub, 
+    .fun = function(x){
+      
+      # metabolism column names
+      met_cols <- c('Pg', 'Rt', 'NEM', 'Pg_dtd', 'Rt_dtd', 'NEM_dtd')
+      
+      # melt by weekly, monthly, seasonal cats
+      x <- melt(x, measure.var = c('week', 'month', 'seas'), 
+        id.var = c('Date', met_cols)
+        )
+      
+      agg_res <- dlply(x,
+        .var = c('variable'), 
+        .fun = function(y){
           
-          DO_pred <- NA
-          beta <- NA
-          Tide <- ref_in$Tide[x]
-          
-          } else {
-          
-            # subset weigths > 0, rescale weights average
-            ref_wts <- ref_wts[[x]]/mean(ref_wts[[x]])
-          
-            # get model
-            mod_md <- lm(
-              DO_obs ~ dec_time + Tide + sin(2*pi*dec_time) + cos(2*pi*dec_time),
-              weights = ref_wts,
-              data = dat_proc
-              )
-          
-            # get prediction from model
-            Tide <- ref_in$Tide[x]
-            DO_pred <- predict(
-              mod_md, 
-              newdata = data.frame(dec_time = ref_in$dec_time[x], Tide = Tide)
-              )
-          
-            # get beta from model
-            beta <- mod_md$coefficients['Tide']
-          
+          out <- vector('list', length = length(met_cols))
+          names(out) <- met_cols
+          for(met in met_cols){
+            
+            tmp <- summarySE(y, measurevar = met, groupvars = 'value',
+              narm = T) 
+            names(tmp)[names(tmp) %in% met] <- 'mean'
+            out[[met]] <- tmp
+             
           }
-        
-        # output
-        data.frame(DO_pred, beta, Tide)
-        
-        }
+          
+          # combine metabolism categories 
+          out <- melt(out, id.var = names(out[[1]]))
+          names(out)[names(out) %in% 'L1'] <- 'var'
+          out
+          
+        })
       
-      )
-
-    do.call('rbind', out)
+      # combine time categories
+      agg_res <- melt(agg_res, id.var = names(agg_res[[1]]))
+      names(agg_res)[names(agg_res) %in% 'L1'] <- 'cats'
       
-    }, key = 'DateTimeStamp']
-
-  return(data.frame(int_out))
-
+      # separate var column into metabolis, obs/dtd
+      agg_res$var[!grepl('dtd',agg_res$var)] <- paste0(
+        agg_res$var[!grepl('dtd',agg_res$var)], '_obs')
+        
+      agg_res$sub_var <- gsub('^[A-Z,a-z]*_', '', agg_res$var)
+      agg_res$var <- gsub('_[a-z]*$', '', agg_res$var)
+      
+      agg_res
+      
+    })
+  
+  return(agg_sum)
+  
   }
 
+agg_sum <- nem_agg_fun(list(met_out))
 
-  
+to_plo <- agg_sum[[1]]
+
+p <- ggplot(to_plo, aes(x = factor(value), y = mean, group = sub_var,
+    colour = sub_var)) +
+  geom_line() + 
+  facet_wrap(cats ~ var, scales = 'free') +
+  theme_bw()
+
+######
+
+# new with synch
+load('int_proc.RData')
+load('prd_nrm.RData') # only rows 1:5000
+
+par(mfrow = c(2,1))
+plot(DO_obs ~ DateTimeStamp, prd_nrm, type = 'l')
+plot(DO_pred ~ DateTimeStamp, prd_nrm, type = 'l')
+points(DO_nrm ~ DateTimeStamp, prd_nrm, type = 'p', 
+  col = as.character(factor(prd_nrm$variable, levels = c('sunrise', 'sunset'),
+    labels = c('orange', 'black'))), 
+  pch = 16, cex = 0.5
+  )
+
+# old with dtd and mtd
+load('M:/docs/manuscripts/swmp_noise/ELKVM_wtreg_1.RData')
+
+windows()
+old <- ELKVM_wtreg_1
+
+plot(DO_prd ~ DateTimeStamp, old[1:5000,], type = 'l')
+plot(DO_nrm ~ DateTimeStamp, old[1:5000,], type = 'l')
+
+y <- with(to_proc, sin(2*pi*dec_time) + cos(2*pi*dec_time ))
+plot(y[1:300] ~ DateTimeStamp, to_proc[1:300,], type = 'l')
+

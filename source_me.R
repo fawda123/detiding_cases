@@ -23,7 +23,7 @@ setwd('M:/docs/SWMP/detiding_cases/')
 # functions to use
 source('case_funs.r')
 
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
+cases <- c('ELKVM', 'PDBBY', 'RKBMB', 'SAPDC')
 
 # setup parallel, for ddply in interpgrd 
 cl <- makeCluster(8)
@@ -32,22 +32,20 @@ registerDoParallel(cl)
 # iterate through evaluation grid to create sim series
 strt <- Sys.time()
 
-# case_subs <- list(75000:76500, 60000:61500, 10000:11500, 88500:90000)
-wins_subs <- list(
-  list(4, 12, NULL), 
-  list(4, 12, NULL), 
-  list(4, 12, NULL), 
-  list(4, 12, NULL)
-  )
+dy_wins <- c(2, 4)
+hr_wins <- c(12, 24)
+td_wins <- c(1, 2)
+case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
+names(case_grds) <- c('dec_time', 'hour', 'Tide')
+save(case_grds, file = 'case_grds.RData')
 
-strt <- Sys.time()
+load('case_grds.RData')
 
 # do w/ tide
 foreach(case = cases) %dopar% {
    
   to_proc <- prep_wtreg(case)
-  subs <- with(to_proc, as.numeric(format(DateTimeStamp, '%Y')) == 2010 &
-      as.numeric(format(DateTimeStamp, '%m')) == 6)
+  subs <- format(to_proc$DateTimeStamp, '%Y') %in% '2012'
   to_proc <- to_proc[subs, ]
   
   # progress
@@ -57,30 +55,34 @@ foreach(case = cases) %dopar% {
   print(Sys.time() - strt)
   sink()
   
-  # get windows
-  wins_in <- wins_subs[[which(case == cases)]]
+  for(i in 1:nrow(case_grds)){
+    
+    # get windows
+    wins_in <- c(case_grds[i,])
+    
+    # create wt reg contour surface
+    int_proc <- interp_grd(to_proc[1:5000,], wins = list(4, 12, 1), 
+      parallel = T, 
+      progress = T)
   
-  # create wt reg contour surface
-  int_proc <- interp_td_grd(to_proc, wins = wins_in)
-  
-  # get predicted, normalized from interpolation grid
-  prd_nrm <- prdnrm_td_fun(int_proc, to_proc)
-  
-  # save interpolation grid
-  int_nm <-paste0(case, '_intgrd_td') 
-  assign(int_nm, int_proc)
-  save(
-    list = int_nm,
-    file=paste0(case,'_intgrd_td.RData')
-    )
-  
-  # save predicted, normalized results
-  prdnrm_nm <-paste0(case, '_prdnrm_td') 
-  assign(prdnrm_nm, prd_nrm)
-  save(
-    list = prdnrm_nm,
-    file=paste0(case,'_prdnrm_td.RData')
-    )
+    # get predicted, normalized from interpolation grid
+    prd_nrm <- prdnrm_fun(int_proc, to_proc[1:5000,])
+    
+    # save interpolation grid
+    int_nm <-paste0(case, '_intgrd_td') 
+    assign(int_nm, int_proc)
+    save(
+      list = int_nm,
+      file=paste0(case,'_intgrd_td.RData')
+      )
+    
+    # save predicted, normalized results
+    prdnrm_nm <-paste0(case, '_prdnrm_td') 
+    assign(prdnrm_nm, prd_nrm)
+    save(
+      list = prdnrm_nm,
+      file=paste0(case,'_prdnrm_td.RData')
+      )
 
   # clear RAM
   rm(list = c(int_nm, prdnrm_nm))
