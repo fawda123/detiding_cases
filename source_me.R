@@ -30,9 +30,7 @@ cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
-strt <- Sys.time()
-
-dy_wins <- c(2, 4)
+dy_wins <- c(2, 4, 8)
 hr_wins <- c(12, 24)
 td_wins <- c(1, 2)
 case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
@@ -41,51 +39,55 @@ save(case_grds, file = 'case_grds.RData')
 
 load('case_grds.RData')
 
+strt <- Sys.time()
+
 # do w/ tide
-foreach(case = cases) %dopar% {
+for(case in cases[2]){
    
   to_proc <- prep_wtreg(case)
   subs <- format(to_proc$DateTimeStamp, '%Y') %in% '2012'
   to_proc <- to_proc[subs, ]
   
-  # progress
-  sink('log.txt')
-  cat('Log entry time', as.character(Sys.time()), '\n')
-  cat(which(case == cases), ' of ', length(cases), '\n')
-  print(Sys.time() - strt)
-  sink()
-  
-  for(i in 1:nrow(case_grds)){
+  foreach(i = 1:nrow(case_grds)) %dopar% {
     
-    # get windows
-    wins_in <- c(case_grds[i,])
+    # progress
+    sink('log.txt')
+    cat('Log entry time', as.character(Sys.time()), '\n')
+    cat(case, '\n')
+    cat(i, ' of ', nrow(case_grds), '\n')
+    print(Sys.time() - strt)
+    sink()
+      
+    load('case_grds.RData')
     
     # create wt reg contour surface
-    int_proc <- interp_grd(to_proc[1:5000,], wins = list(4, 12, 1), 
-      parallel = T, 
-      progress = T)
+    int_proc <- interp_grd(to_proc, wins = c(case_grds[i,]), 
+      parallel = F, 
+      progress = F)
   
     # get predicted, normalized from interpolation grid
-    prd_nrm <- prdnrm_fun(int_proc, to_proc[1:5000,])
+    prd_nrm <- prdnrm_fun(int_proc, to_proc)
     
     # save interpolation grid
-    int_nm <-paste0(case, '_intgrd_td') 
+    int_nm <-paste0(case, '_intgrd_', i) 
     assign(int_nm, int_proc)
     save(
       list = int_nm,
-      file=paste0(case,'_intgrd_td.RData')
+      file=paste0(case,'_intgrd_', i, '.RData')
       )
     
     # save predicted, normalized results
-    prdnrm_nm <-paste0(case, '_prdnrm_td') 
+    prdnrm_nm <-paste0(case, '_prdnrm_', i) 
     assign(prdnrm_nm, prd_nrm)
     save(
       list = prdnrm_nm,
-      file=paste0(case,'_prdnrm_td.RData')
+      file=paste0(case,'_prdnrm_', i, '.RData')
       )
 
-  # clear RAM
-  rm(list = c(int_nm, prdnrm_nm))
+    # clear RAM
+    rm(list = c(int_nm, prdnrm_nm))
+    
+    }
   
   }
 

@@ -1,3 +1,4 @@
-Log entry time 2014-08-01 16:15:01 
-5000  of  5000 
-Time difference of 3.056656 mins
+Log entry time 2014-08-05 14:15:49 
+PDBBY 
+12  of  12 
+Time difference of 1.276644 hours

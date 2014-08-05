@@ -481,9 +481,27 @@ p <- ggplot(to_plo, aes(x = factor(value), y = mean, group = sub_var,
 
 ######
 
-# new with synch
 load('int_proc.RData')
 load('prd_nrm.RData') # only rows 1:5000
+
+##
+# plot interp grid
+
+to.plo <- int_proc
+
+#interp grid removing extreme values
+ylabs <- 'Pred. DO'
+ggplot(to.plo, aes(x = DateTimeStamp, y = Tide)) + 
+  geom_tile(aes(fill = DO_pred), expand = c(0,0)) +
+  scale_fill_gradientn(
+    colours = brewer.pal(11, 'Spectral')
+    ) +
+  theme_bw() +
+  scale_x_datetime(
+    name='Date',
+    expand = c(0,0)
+    ) + 
+  scale_y_continuous(expand = c(0,0))
 
 par(mfrow = c(2,1))
 plot(DO_obs ~ DateTimeStamp, prd_nrm, type = 'l')
@@ -502,7 +520,3 @@ old <- ELKVM_wtreg_1
 
 plot(DO_prd ~ DateTimeStamp, old[1:5000,], type = 'l')
 plot(DO_nrm ~ DateTimeStamp, old[1:5000,], type = 'l')
-
-y <- with(to_proc, sin(2*pi*dec_time) + cos(2*pi*dec_time ))
-plot(y[1:300] ~ DateTimeStamp, to_proc[1:300,], type = 'l')
-
