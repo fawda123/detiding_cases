@@ -124,7 +124,8 @@ nem.fun<-function(dat.in, stat, DO_var = 'DO_mgl', depth.val = NULL,
   strt<-Sys.time()
   
   #columns to be removed prior to processing
-  to.rem<-c('flag')
+  to.rem<-c('flag', 'dTide', 'met.date', 'variable', 'value', 'day.hrs', 
+    'dec_time', 'hour')
   dat.in<-dat.in[,!names(dat.in) %in% to.rem]
   
   #convert DO from mg/L to mmol/m3
@@ -1689,13 +1690,17 @@ ts_create <- function(time_in, do.amp, tide_cat, tide_assoc, err_rng_obs,
 # 'grd_in' is interpolation grid in from 'interp_grd' function
 # 'dat_in' is raw data used to create 'grd_in' and used to get predictions
 # 'DO_obs' is string indicating name of col for observed DO values from 'dat_in'
+# 'wtd_ave'  is logical indicating if normalization weights values in the interp grid differently
+# 'wtd_ave' as T will weight values based on freq occurrence of tide through period of record
 # output is data frame same as 'dat_in' but includes predicted and norm columns
-prdnrm_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs'){
+prdnrm_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs', wtd_ave = T){
   
-  require(data.table)
+  library(data.table)
+  library(plyr)
+  library(reshape2)
   
   # merge int grd with obs data
-  DO_mrg <- merge(grd_in, dat_in[, c('DateTimeStamp', DO_obs, 'Tide')],
+  DO_mrg <- merge(grd_in, dat_in[, c('DateTimeStamp', DO_obs, 'Tide', 'hour')],
     by = 'DateTimeStamp')
 
   # convert merged data to data table, key is DateTimeStamp
@@ -1705,9 +1710,31 @@ prdnrm_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs'){
   DO_pred <- DO_tab[, DO_pred[which.min(abs(Tide.x - Tide.y))], 
     key = 'DateTimeStamp']
 
+  if(wtd_ave){
+    
+    tide_div <- length(unique(DO_mrg$Tide.x)) + 1
+    tide.grid<-seq(min(dat_in$Tide), max(dat_in$Tide), length = tide_div)
+    dat_in$tide_cat <- cut(dat_in$Tide, breaks = tide.grid, 
+      labels = seq(1,10))
+
+    tide_prob <- ddply(dat_in, 
+      .variables = 'hour', 
+      .fun = function(x){
+        
+        tabs <- table(x$tide_cat)
+        tabs/sum(tabs)
+        
+      })
+    tide_prob <- melt(tide_prob, id.var = 'hour', value.name = 'tide_pr')  
+    names(tide_prob)[names(tide_prob) %in% 'variable'] <- 'tide_cat'
+    
+    dat_in <- merge(dat_in, tide_prob, by = c('hour', 'tide_cat'), sort = F)
+    
+    }
+  
   # get normalized values by averaging
   # note that this differs from hirsch method for interp
-  # assumes all dtide values are equally likely for a given obs
+  # assumes all tide values are equally likely for a given obs
   DO_nrm <- DO_tab[, mean(DO_pred), key = 'DateTimeStamp']
 
   # add predicted to 'dat_in'
