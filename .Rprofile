@@ -19,6 +19,7 @@ library(ggmap)
 library(data.table)
 library(oce)
 library(zoo)
+library(RColorBrewer)
 
 # functions to use
 source('case_funs.r')

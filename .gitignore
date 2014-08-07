@@ -1,6 +1,4 @@
 .Rproj.user
 .Rhistory
-.RData
-cache/*
 *.RData
-met_ls.RData
+cache/*

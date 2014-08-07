@@ -25,60 +25,68 @@ setwd('M:/docs/SWMP/detiding_cases/')
 # functions to use
 source('case_funs.r')
 
-cases <- c('ELKVM','PDBBY', 'RKBMB', 'SAPDC')
+cases <- c('ELKVM', 'PDBBY', 'RKBMB', 'SAPDC')
 
 # setup parallel backend
 cl <- makeCluster(8)
 registerDoParallel(cl)
 
-# iterate through evaluation grid to create sim series
-strt <- Sys.time()
-day_wins <- c(1, 2, 5, 10, 15, 30, 45, 60)
-tide_wins <- c(0.25, 0.5, 1, 2)
-
-case_grds <- expand.grid(day_wins, tide_wins)
-names(case_grds) <- c('Day', 'Tide')
+# window widths grid
+dy_wins <- c(1, 2, 4, 8)
+hr_wins <- c(3, 6, 12, 24)
+td_wins <- c(0.25, 0.5, 1, 2)
+case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
+names(case_grds) <- c('dec_time', 'hour', 'Tide')
 save(case_grds, file = 'case_grds.RData')
 
-# do w/ tide, subset by year
+load('case_grds.RData')
+
+# setup parallel backend
+cl <- makeCluster(8)
+registerDoParallel(cl)
+
+# start time
+strt <- Sys.time()
+
+# do w/ tide
 for(case in cases){
-    
-  # prep input
+   
   to_proc <- prep_wtreg(case)
-  yr_sel <- as.numeric(format(to_proc$DateTimeStamp, '%Y'))
-  yr_sel <- yr_sel %in% 2012
-  to_proc <- to_proc[yr_sel, ]
+  subs <- format(to_proc$DateTimeStamp, '%Y') %in% '2012'
+  to_proc <- to_proc[subs, ]
   
-  #iterate through window grids
   foreach(i = 1:nrow(case_grds)) %dopar% {
-  
+    
     # progress
     sink('log.txt')
     cat('Log entry time', as.character(Sys.time()), '\n')
-    cat('row', i, 'case', which(case == cases), 'of', length(cases), '\n')
+    cat(case, '\n')
+    cat(i, ' of ', nrow(case_grds), '\n')
     print(Sys.time() - strt)
     sink()
+      
+    load('case_grds.RData')
     
-    # windows in case_grds
-    wins_in <- list(case_grds[i, 1], case_grds[i, 2])
+    # create wt reg contour surface
+    wtreg <- wtreg_fun(to_proc, wins = c(case_grds[i,]), 
+      parallel = F, 
+      progress = F)
     
-    # get pred, norm
-    wtreg <- wtreg_fun(to_proc, wins = wins_in)
-
-    # save results
-    wtreg_nm <- paste(case, 'wtreg', i, sep ='_') 
+    # save results for each window
+    wtreg_nm <-paste0(case, '_wtreg_', i) 
     assign(wtreg_nm, wtreg)
     save(
       list = wtreg_nm,
-      file=paste(case, '_wtreg_', i, '.RData', sep = '')
+      file=paste0(wtreg_nm, '.RData')
       )
 
     # clear RAM
-    rm(list = wtreg_nm)
+    rm(list = c(wtreg_nm))
     
     }
   
   }
+
 stopCluster(cl)
 
 #####
@@ -114,7 +122,7 @@ met_ls <- foreach(case = cases) %dopar% {
   met_obs <- nem.fun(dat_in, stat = stat, 
     DO_var = 'DO_obs')
   met_dtd <- nem.fun(dat_in, stat = stat, 
-    DO_var = 'DO_dtd')
+    DO_var = 'DO_nrm')
   
   # combine results
   col_sel <- c('Pg', 'Rt', 'NEM')
@@ -131,54 +139,3 @@ stopCluster(cl)
 
 names(met_ls) <- cases
 save(met_ls, file = 'met_ls.RData')
-
-######
-# calculate instantaneous flux rates
-
-# setup parallel backend
-cl <- makeCluster(8)
-registerDoParallel(cl)
-
-# start time
-strt <- Sys.time()
-
-# metab ests as list
-met_ls_inst <- foreach(case = cases) %dopar% {
-  
-  # progress
-  sink('log.txt')
-  cat('Log entry time', as.character(Sys.time()), '\n')
-  cat(which(case == cases), ' of ', length(cases), '\n')
-  print(Sys.time() - strt)
-  sink()
-  
-  # get data for eval
-  load(case)
-  nm <- gsub('.RData', '', case)
-  stat <- gsub('_wtreg_[0-9]+$', '', nm)
-  dat_in <- get(nm)
-  
-  # get inst DOF for obs and dtd
-  met_obs <- inst.flux.fun(dat_in, stat = stat, 
-    DO_var = 'DO_obs')
-  met_dtd <- inst.flux.fun(dat_in, stat = stat, 
-    DO_var = 'DO_dtd')
-  
-  # combine results, DOF corrects for air-sea xchange
-  DOF_obs <- with(met_obs, DOF - D)
-  D_obs <- with(met_obs, D)
-  DOF_dtd <- with(met_dtd, DOF - D)
-  D_dtd <- with(met_dtd, D)
-
-  rm_col <- !names(met_obs) %in% c('D', 'DOF')
-  met_out <- data.frame(met_obs[, rm_col], DOF_obs, D_obs, DOF_dtd, D_dtd)
-  
-  # return results
-  met_out
-
-  }
-stopCluster(cl)
-
-names(met_ls_inst) <- cases
-save(met_ls_inst, file = 'met_ls_inst.RData')
-

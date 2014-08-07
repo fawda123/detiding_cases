@@ -124,7 +124,8 @@ nem.fun<-function(dat.in, stat, DO_var = 'DO_mgl', depth.val = NULL,
   strt<-Sys.time()
   
   #columns to be removed prior to processing
-  to.rem<-c('flag')
+  to.rem<-c('flag', 'dTide', 'met.date', 'variable', 'value', 'day.hrs', 
+    'dec_time', 'hour')
   dat.in<-dat.in[,!names(dat.in) %in% to.rem]
   
   #convert DO from mg/L to mmol/m3
@@ -1210,25 +1211,38 @@ poly.fun<-function(flag.in,dat, fill.val='yellow1'){
   }
 
 ##
-# create dec time using jday on 24 hour scale
-# 'dat_in' is data frame input with time vecot as 'var_nm'
+# create dec time using day on 24 hour scale
+# 'dat_in' is data frame input with time vector as posix
 # output is same data frame including new columns column
-dec_fun <- function(dat_in, var_nm = 'DateTimeStamp'){
+dec_fun <- function(dat_in){
+  
+  # get decimal value by metabolic date for hour/min
+  by_met <- dlply(dat_in,
+    .variable = 'met.date',
+    .fun = function(x){
+    
+      strt <- (48 - nrow(x))/48
+      out <- seq(strt, 1, length = 1 + nrow(x)) 
+      out <- out[1:(length(out) - 1)]
+      
+      out
+      
+      }
+    )
+  
+  # get continuous day value
+  days <- as.character(seq(1:(length(by_met))) - 1)
+  names(by_met) <- days
+  by_met <- melt(by_met)
+  by_met$L1 <- as.numeric(by_met$L1)
+  
+  # add continuous day value to decimal value
+  out <- rowSums(by_met)
 
-  # get time vec from dat_in
-  posix_in  <- dat_in[, var_nm]
+  # add to dat_in
+  dat_in$dec_time <- out
   
-  #dec time on 24 hr scale, year added for ts with more than one year
-  year <- as.numeric(format(posix_in, '%Y'))
-  jday <- as.numeric(format(posix_in, '%j')) # 0 - 366
-  hour <- as.numeric(format(posix_in, '%H')) # 0 - 23
-  minu<- as.numeric(format(posix_in, '%M')) # 0-59
-  
-  # add separate vecs on same scale
-  dec_time <- year + scales::rescale(jday, c(0, 365))/366 + 
-    hour/24/366 + minu/60/24/366
-  out <- data.frame(dat_in, year, jday, hour, dec_time)
-  return(out)
+  return(dat_in)
   
   }
 
@@ -1257,10 +1271,14 @@ wt_fun <- function(ref_in, dat_in,
   if(sum(wt_vars %in% names(dat_in)) != length(wt_vars))
     stop('Weighting variables must be named in "dat_in"')
   
-  # windows for each variable
-  wins_1<-wins[[1]]/365/2
-  wins_2 <- wins[[2]] * diff(range(dat_in[, wt_vars[2]]))/2
-    
+  # windows for each of three variables
+  wins_1<-wins[[1]]
+  wins_2<-wins[[2]]
+  wins_3<-wins[[3]]
+  
+  # default window width for third variable is half its range
+  if(is.null(wins[[3]])) wins_3 <- diff(range(dat_in[, wt_vars[3]]))/2
+
   # weighting tri-cube function
   # mirror extends weighting function if vector repeats, e.g. monthly
   # 'dat_cal' is observation for weight assignment
@@ -1277,7 +1295,8 @@ wt_fun <- function(ref_in, dat_in,
     if(mirr){
       
         dist_val <- pmin(
-          sapply(ref, function(x) abs(x + scl_val - dat_cal)),
+          sapply(ref, function(x)
+            abs(x + scl_val - dat_cal)),
           sapply(ref, function(x) abs(dat_cal + scl_val - x)),
           dist_val
           )
@@ -1305,7 +1324,8 @@ wt_fun <- function(ref_in, dat_in,
   dec_rng <- range(dat_in$dec_time)
   ref_time <- unique(ref_in$dec_time)
   dec_sub <- with(dat_in, 
-    dec_time > ref_time - wins_1 * 5 & dec_time < ref_time + wins_1 * 5
+    dec_time > 
+      ref_time - wins_1 * 5 & dec_time < ref_time + wins_1 * 5
     )
   if(!slice) dec_sub <- rep(T, length = nrow(dat_in))
   dat_sub <- dat_in[dec_sub, ]
@@ -1472,29 +1492,33 @@ filled.contour.hack <- function (x = seq(0, 1, length.out = nrow(z)), y = seq(0,
   }
 
 ######
-# get predicted, normalized values not using interp grid, tide as predictor
-# wins are whole window widths, not halves, number of days and tidal height
-# 'dat_in' is raw data used to create 'grd_in' and used to get predictions
-# 'DO_obs' is string indicating name of col for observed DO values from 'dat_in'
-# output is data frame same as 'dat_in' but includes predicted and norm columns
-wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', wins = list(10, 1),
-  parallel = F, progress = F){
-
-  # get mean tidal height from empirical data
-  mean_tide <- mean(dat_in$Tide)
+# interpolation grid for weighted regression, tide as predictor
+# 'dat_in' is data.frame to interpolate, must contain dTide, dec_day, DO_obs, DateTimeStamp
+# 'dtide_div' is number of values to interp for grid
+# 'wins' is list of values for windows to determine weights
+# 'parallel' is logical if using ddply in parallel, must setup backend first
+# 'progress' is logical that makes log, note that this isn't the progress used by ddply
+interp_grd <- function(dat_in, tide_div = 1,
+  wins = list(4, 12, NULL), parallel = F, progress = F){
+  
+  # assign to local env for ddply
+  tide_div <- tide_div
+  
+  # setup range of tidal vals to predict for grid
+  tide.grid<-seq(min(dat_in$Tide), max(dat_in$Tide), length = tide_div)
 
   #for counter
   strt <- Sys.time()
   
   out <- ddply(dat_in, 
     .variable = 'DateTimeStamp',
-    .parallel = parallel, 
+    .parallel = parallel,
     .fun = function(row){
       
       # row for prediction
       ref_in <- row
-      ref_in <- ref_in[rep(1, 2),]
-      ref_in$Tide <- c(unique(ref_in$Tide), mean_tide)
+      ref_in <- ref_in[rep(1, tide_div),]
+      ref_in$Tide <- tide.grid
       
       # progress
       if(progress){
@@ -1508,7 +1532,7 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', wins = list(10, 1),
       
       # get wts
       ref_wts <- wt_fun(ref_in, dat_in, wins = wins, slice = T, 
-        subs_only = T, wt_vars = c('dec_time', 'Tide'))
+        subs_only = T, wt_vars = c('dec_time', 'hour', 'Tide'))
   
       #OLS wtd model
       out <- lapply(1:length(ref_wts),
@@ -1529,8 +1553,8 @@ wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', wins = list(10, 1),
             
               # get model
               mod_md <- lm(
-                DO_obs ~ dec_time + Tide,
-                weights = ref_wts[[x]],
+                DO_obs ~ dec_time + Tide + sin(2*pi*dec_time) + cos(2*pi*dec_time),
+                weights = ref_wts,
                 data = dat_proc
                 )
             
@@ -1648,6 +1672,59 @@ ts_create <- function(time_in, do.amp, tide_cat, tide_assoc, err_rng_obs,
   return(DO_sim)
   
   }
+  
+######
+# get predicted, normalized values from interp grid and obs data, tide as predictor
+# 'grd_in' is interpolation grid in from 'interp_grd' function
+# 'dat_in' is raw data used to create 'grd_in' and used to get predictions
+# 'DO_obs' is string indicating name of col for observed DO values from 'dat_in'
+# 'const' is logical indicating of normalized value are form tidal mean
+# 'const' as F will average all tidal preds from interp grid
+# output is data frame same as 'dat_in' but includes predicted and norm columns
+prdnrm_fun <- function(grd_in, dat_in, DO_obs = 'DO_obs', const= T){
+  
+  library(data.table)
+  library(plyr)
+  library(reshape2)
+  
+  # merge int grd with obs data
+  DO_mrg <- merge(grd_in, dat_in[, c('DateTimeStamp', DO_obs, 'Tide', 'hour')],
+    by = 'DateTimeStamp')
+
+  # create factor for tidal category for merging later
+  DO_mrg$tide_cat <- factor(DO_mrg$Tide.x, 
+    labels = seq(1, length(unique(DO_mrg$Tide.x))))
+  
+  # convert merged data to data table, key is DateTimeStamp
+  DO_tab <- data.table(DO_mrg, key = c('DateTimeStamp', 'hour', 'tide_cat'))
+
+  # get predicted DO from table
+  DO_pred <- DO_tab[, DO_pred[which.min(abs(Tide.x - Tide.y))], 
+    key = 'DateTimeStamp']
+
+  # get normalized values by constant tidal height
+  # assumes all tide values are not equally like for a given obs
+  if(const){
+    
+    DO_nrm <- subset(DO_tab, tide_cat %in% c(5))$DO_pred
+      
+  } else {
+  
+    # get normalized values by averaging
+    # assumes all tide values are equally likely for a given obs
+    DO_nrm <- DO_tab[, mean(DO_pred), key = 'DateTimeStamp']$V1
+    
+  }
+
+  # add predicted to 'dat_in'
+  dat_in$DO_pred <- DO_pred$V1
+   
+  # add normalized to 'dat_in', note that DO_obs is a chr object
+  dat_in$DO_nrm <- DO_nrm
+  
+  return(dat_in)
+  
+  }
 
 ######
 # using expressions in facet_wrap labels
@@ -1725,8 +1802,14 @@ prep_wtreg <- function(site_in,
   # get dTide
   to_proc$dTide <- with(to_proc, c(diff(Tide)[1], diff(Tide)))
   
+  # get metabolic day info
+  to_proc <- met.day.fun(to_proc, case)
+  
   # setup as decimal time
   to_proc <- dec_fun(to_proc)
+  
+  to_proc$hour <- as.numeric(format(to_proc$DateTimeStamp, '%H')) +
+    as.numeric(format(to_proc$DateTimeStamp, '%M'))/60
   
   # remove extra cols
   to_rm <- c('SpCond', 'DO_pct', 'cDepth', 'pH', 'Turb', 'ChlFluor',
@@ -1748,6 +1831,102 @@ prep_wtreg <- function(site_in,
     
   }
   
+######
+# get predicted, normalized values not using interp grid, tide as predictor
+# 'dat_in' is raw data used to create 'grd_in' and used to get predictions
+# 'DO_obs' is string indicating name of col for observed DO values from 'dat_in'
+# output is data frame same as 'dat_in' but includes predicted and norm columns
+wtreg_fun <- function(dat_in, DO_obs = 'DO_obs', wins = list(4, 12, NULL),
+  parallel = F, progress = F){
+
+  # get mean tidal height from empirical data
+  mean_tide <- mean(dat_in$Tide)
+
+  #for counter
+  strt <- Sys.time()
   
+  out <- ddply(dat_in, 
+    .variable = 'DateTimeStamp',
+    .parallel = parallel, 
+    .fun = function(row){
+      
+      # row for prediction
+      ref_in <- row
+      ref_in <- ref_in[rep(1, 2),]
+      ref_in$Tide <- c(unique(ref_in$Tide), mean_tide)
+      
+      # progress
+      if(progress){
+        prog <- which(row$DateTimeStamp == dat_in$DateTimeStamp)
+        sink('log.txt')
+        cat('Log entry time', as.character(Sys.time()), '\n')
+        cat(prog, ' of ', nrow(dat_in), '\n')
+        print(Sys.time() - strt)
+        sink()
+        }
+      
+      # get wts
+      ref_wts <- wt_fun(ref_in, dat_in, wins = wins, slice = T, 
+        subs_only = T, wt_vars = c('dec_time', 'hour', 'Tide'))
+  
+      #OLS wtd model
+      out <- lapply(1:length(ref_wts),
+        function(x){
+          
+          # subset data for weights > 0
+          dat_proc <- dat_in[as.numeric(names(ref_wts[[x]])),]
+          
+          # if no DO values after subset, return NA
+          # or if observed DO for the row is NA, return NA
+          if(sum(is.na(dat_proc$DO_obs)) == nrow(dat_proc)|
+              any(is.na((ref_in$DO_obs)))){
+            
+            DO_pred <- NA
+            beta <- NA
+            Tide <- ref_in$Tide[x]
+            
+            } else {
+            
+              # subset weigths > 0, rescale weights average
+              ref_wts <- ref_wts[[x]]/mean(ref_wts[[x]])
+            
+              # get model
+              mod_md <- lm(
+                DO_obs ~ dec_time + Tide, # + sin(2*pi*dec_time) + cos(2*pi*dec_time),
+                weights = ref_wts,
+                data = dat_proc
+                )
+            
+              # get prediction from model
+              Tide <- ref_in$Tide[x]
+              DO_pred <- predict(
+                mod_md, 
+                newdata = data.frame(dec_time = ref_in$dec_time[x], Tide = Tide)
+                )
+            
+              # get beta from model
+              beta <- mod_md$coefficients['Tide']
+            
+            }
+          
+          # output
+          DO_pred
+          
+          }
+        
+        )
+
+      out <- unlist(out)
+      names(out) <- c('DO_prd', 'DO_nrm')
+      out
+      
+      })
+  
+  out$DateTimeStamp <- NULL
+  out <- cbind(dat_in, out)
+
+  return(out)
+  
+  } 
   
 
