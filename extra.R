@@ -207,176 +207,18 @@ p3 <- ggplot(to_plo3, aes(x = Date, y = value, group = L1, colour = L1)) +
 print(p3)
 
 ######
-#
-
-# low do/high tide, high do/low tide, low do/low tide, high do/low tide
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
-case <- cases[2]
-
-load(paste0(case, '_prdnrm_td.RData'))
-load(paste0(case, '_intgrd_td.RData'))
-
-prdnrm <- get(paste0(case, '_prdnrm_td'))
-int_grd <- get(paste0(case, '_intgrd_td'))
-
-# load(paste0(case, '_prdnrm_dtd.RData'))
-# load(paste0(case, '_intgrd_dtd.RData'))
-# 
-# prdnrm <- get(paste0(case, '_prdnrm_dtd'))
-# int_grd <- get(paste0(case, '_intgrd_dtd'))
-
-subs <- 7000:8000
-
-to_plo <- prdnrm[subs,]
-to_plo <- met.day.fun(to_plo, case)
-to_plo$sunrise <- factor(to_plo$variable, levels = c('sunrise', 'sunset'), 
-  labels = c('DO_nrm, day', 'DO_nrm, night'))
-
-p1 <- ggplot(to_plo, aes(x = DateTimeStamp, y = DO_obs, colour = 'DO_obs')) + 
-  geom_line() +
-  geom_line(aes(y = DO_pred, colour = 'DO_pred'), size = 2) +
-  geom_line(aes(y = DO_nrm, colour = sunrise, group = 1), size = 2) +
-#   scale_y_continuous(limits = c(10, 14)) +
-  theme_bw() + 
-  theme(legend.title = element_blank(), legend.position = 'top')
-
-p2 <- ggplot(to_plo, aes(x = DateTimeStamp, y = Tide, colour = sunrise, group = 1)) + 
-  geom_line() +
-  geom_line(aes(y = dTide)) +
-  geom_point(aes(y = Depth)) +
-  theme_bw() +
-  theme(legend.title = element_blank(), legend.position = 'top')
-
-sim_grd <- int_grd[subs[1]:(10*subs[length(subs)]),]
-
-p3 <- ggplot(sim_grd, aes(x = DateTimeStamp, y = factor(round(Tide,1)), 
-    z = DO_pred, fill = DO_pred)) +
-  geom_tile() + 
-  scale_fill_gradientn(colours=cm.colors(3)) +
-  scale_x_datetime(expand = c(0,0)) + 
-  scale_y_discrete(expand = c(0,0)) +
-  ylab('Tide') +
-  theme_bw() +
-  theme(legend.title = element_blank(), legend.position = 'top')
-
-grid.arrange(p1, p2, p3, ncol = 1)
-
-# get metabs
-met_subs <- 1:nrow(prdnrm)
-dat_met_obs <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_obs')
-dat_met_prd <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_pred')
-dat_met_nrm <- nem.fun(prdnrm[met_subs, ], case, DO_var = 'DO_nrm')
-
-anoms.fun(dat_met_obs)
-anoms.fun(dat_met_prd)
-anoms.fun(dat_met_nrm)
-
-to_plo1 <- melt(dat_met_obs, id.var = 'Date', 
-  measure.var = c('NEM', 'Pg', 'Rt'))
-to_plo2 <- melt(dat_met_prd, id.var = 'Date', 
-  measure.var = c('NEM', 'Pg', 'Rt'))
-to_plo3 <- melt(dat_met_nrm, id.var = 'Date', 
-  measure.var = c('NEM', 'Pg', 'Rt'))
-
-p1 <- ggplot(to_plo1, aes(x = Date, y = value, group = variable, 
-    colour = variable)) +
-  geom_line() +
-  theme_bw()
-p2 <- ggplot(to_plo2, aes(x = Date, y = value, group = variable, 
-    colour = variable)) +
-  geom_line() +
-  theme_bw()
-p3 <- ggplot(to_plo3, aes(x = Date, y = value, group = variable, 
-    colour = variable)) +
-  geom_line() +
-  theme_bw()
-grid.arrange(p1, p2, p3, ncol = 1)
-
-pair_plo <- prdnrm[,c('Tide', 'dTide', 'DO_obs', 'DO_pred', 'DO_nrm')]
- 
-ggpairs(pair_plo)
-
-######
-# get summary plots of metab before/after
-
-cases <- c('KACHD', 'PDBBY', 'MARMB', 'WKBFR')
-
-met_ls <- vector('list', length = length(cases))
-names(met_ls) <- cases
-
-for(case in cases){
-
-  load(paste0(case, '_prdnrm_td.RData'))
-  load(paste0(case, '_intgrd_td.RData'))
-  
-  prdnrm <- get(paste0(case, '_prdnrm_td'))
-  int_grd <- get(paste0(case, '_intgrd_td'))
-  
-  # get metabs
-  dat_met_obs <- nem.fun(prdnrm, case, DO_var = 'DO_obs')
-  dat_met_prd <- nem.fun(prdnrm, case, DO_var = 'DO_pred')
-  dat_met_nrm <- nem.fun(prdnrm, case, DO_var = 'DO_nrm')
-  met_out <- list(obs = dat_met_obs, prd = dat_met_prd, 
-    nrm = dat_met_nrm)
-  met_out <- llply(met_out,
-    .fun = function(x) x[, !names(x) %in% c('DO_obs', 'DO_pred', 'DO_nrm')])
-    
-  met_out <- melt(met_out, id.var = names(met_out[[1]]))
-  
-  met_ls[[case]] <- met_out
-    
-  }
-
-tmp <- llply(met_ls, melt)
-
-to_plo <- melt(res_ls)
-to_plo$L2 <- factor(to_plo$L2, levels = c('1','2','3'),
-  labels = c('DO_obs', 'DO_prd', 'DO_nrm'))
-to_plo$met <- rep(c('percent', 'Mean anom', 'Mean regs'), rep = 24)
-
-ggplot(to_plo, aes(x = variable, y = value, fill = L2)) +
-    geom_bar(stat = 'identity', position = 'dodge') + 
-    facet_grid(met ~ L1)
-
-
-######
-#
-# check weights
-
-case <- 'WKBFR'
-
-to_proc <- prep_wtreg(case)
-
-wts <- wt_fun(to_proc[1500,], to_proc, all = T, wins = list(1, 12, NULL), 
-  slice = F, subs_only = F)
-to_plo <- melt(wts[1:3000,], id.var = 'DateTimeStamp')
-ggplot(to_plo, aes(x = DateTimeStamp, y = value, colour = variable, 
-  group = variable)) +
-  geom_line() +
-  facet_wrap(~variable) + 
-  theme_bw()
-
-######
 # for each obs in each day, what  is frequency of tidal obs???
-case <- 'WKBFR'
+case <- 'PDBBY'
 
 # get proc data
 to_proc <- prep_wtreg(case)
+subs <- format(to_proc$DateTimeStamp, '%Y') %in% '2012'
+to_proc <- to_proc[subs, ]
 
-load(paste0(case, '_prdnrm.RData'))
-prdnrm <- get(paste0(case, '_prdnrm'))
-ggplot(prdnrm, aes(x = Tide)) + 
-  geom_histogram() + 
+to_plo <- to_proc
+ggplot(to_plo, aes(x = Tide)) + 
+  geom_histogram(binwidth = diff(range(to_plo$Tide))/10) + 
   facet_wrap(~ hour)
-
-# get int grid
-load(paste0(case, '_intgrd.RData'))
-
-int_grd <- get(paste0(case, '_intgrd')) 
-ggplot(int_grd, aes(x = DateTimeStamp, y = DO_pred, group = Tide,
-  colour = Tide)) + 
-  geom_point() + 
-  theme_bw()
 
 ######
 # weekly, monthly, seasonal aggregations of metab estimates
@@ -481,8 +323,8 @@ p <- ggplot(to_plo, aes(x = factor(value), y = mean, group = sub_var,
 
 ######
 
-case <- 'ELKVM'
-i <- 8
+case <- 'PDBBY'
+i <- 1
 
 load(paste0(case, '_intgrd_', i, '.RData'))
 load(paste0(case, '_prdnrm_', i, '.RData'))
@@ -529,7 +371,7 @@ load('met_ls.RData')
 load('case_grds.RData')
 
 # go through each site for DO cors, use metab list for metab cors
-case_regs <- list.files(getwd(), '_prdnrm_[0-9]*.RData')
+case_regs <- list.files(getwd(), 'PDBBY_prdnrm_[0-9]*.RData')
 cor_res <- alply(matrix(case_regs),
   1, 
   .fun = function(x){
@@ -546,25 +388,12 @@ cor_res <- alply(matrix(case_regs),
     
     # DO dtd v tide
     do_dtd <- with(dat_in, 
-      cor.test(DO_dtd, Tide)
+      cor.test(DO_nrm, Tide)
       )
-    
-    # inst flux data
-    flux_in <- met_ls_inst[[x]]
-    
-    # DOF with dtide
-    flux_obs <- with(flux_in, 
-      cor.test(DOF_obs, dTide)
-      )
-    
-    # DOF_dtd with dtide
-    flux_dtd <- with(flux_in, 
-      cor.test(DOF_dtd, dTide)
-      ) 
     
     # get tidal range for metabolic day/night periods from flux_in
     # for correlation with daily integrated metab
-    tide_rngs <- ddply(flux_in, 
+    tide_rngs <- ddply(dat_in, 
       .variables = c('met.date'),
       .fun = function(x){
 #         sunrise <- suppressWarnings(diff(range(x[x$variable %in% 'sunrise', 'Tide'])))
@@ -621,7 +450,7 @@ cor_res <- alply(matrix(case_regs),
     
     # DO and metab corrs combined
     all_ls <- c(do_obs = list(do_obs), do_dtd = list(do_dtd),
-      flux_obs = list(flux_obs), flux_dtd = list(flux_dtd), met_cor)
+      met_cor)
     
     # convert the stats for each wtreg to data frame
     res_sum <- ldply(all_ls, 
@@ -636,8 +465,8 @@ names(cor_res) <- case_regs
 
 # melt and make separate columns for site and window comb value
 cor_res <- melt(cor_res, id.var = names(cor_res[[1]]))  
-cor_res$site <- gsub('_wtreg_[0-9]*.RData', '', cor_res$L1)
-cor_res$wins <- as.numeric(gsub('^.*_wtreg_|.RData', '', cor_res$L1))
+cor_res$site <- gsub('_prdnrm_[0-9]*.RData', '', cor_res$L1)
+cor_res$wins <- as.numeric(gsub('^.*_prdnrm_|.RData', '', cor_res$L1))
 
 # merge with case_grds
 case_grds$wins <- as.numeric(row.names(case_grds))
@@ -653,14 +482,15 @@ to_plo <- cor_res
 to_plo$group_var <- paste(to_plo$Tide, to_plo$sub_var)
 to_plo_obs <- to_plo[to_plo$sub_var %in% 'obs', ]
 p1 <- ggplot(to_plo[to_plo$sub_var %in% 'dtd',], 
-    aes(x = factor(Day), y = cor, colour = Tide, group = group_var)) +
+    aes(x = dec_time, y = cor, colour = Tide, group = group_var)) +
   geom_line() + 
   geom_line(data = to_plo_obs, 
-    aes(x = factor(Day), y = cor, group = group_var), 
+    aes(x = dec_time, y = cor, group = group_var), 
     colour = 'black', size = 1) +
   geom_point(aes(pch = sub_var)) +
-  facet_grid(var ~ site) +
-  ylim(c(-1, 1)) 
+  facet_grid(hour ~ var) +
+  ylim(c(-1, 1))
+
 ######
 # fig
 
@@ -669,7 +499,7 @@ load('met_ls.RData')
 
 # subset metab estimates by case and window comb
 load('case_grds.RData')
-sel_vec <- with(case_grds, which(dec_time == 8 & hour == 24 & Tide == 2))
+sel_vec <- with(case_grds, which(dec_time == 2 & hour == 6 & Tide == 0.5))
 sel_vec <- paste0('PDBBY', '_prdnrm_', sel_vec)
 
 met_sub <- met_ls[grep(sel_vec, names(met_ls))]

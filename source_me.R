@@ -30,9 +30,9 @@ cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # iterate through evaluation grid to create sim series
-dy_wins <- c(2, 4, 8)
-hr_wins <- c(6, 12, 24)
-td_wins <- c(0.5, 1, 2)
+dy_wins <- c(1, 2, 4, 8)
+hr_wins <- c(3, 6, 12, 24)
+td_wins <- c(0.25, 0.5, 1, 2)
 case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
 names(case_grds) <- c('dec_time', 'hour', 'Tide')
 save(case_grds, file = 'case_grds.RData')
@@ -61,40 +61,26 @@ for(case in cases){
     load('case_grds.RData')
     
     # create wt reg contour surface
-    int_proc <- interp_grd(to_proc, wins = c(case_grds[i,]), 
+    wtreg <- wtreg_fun(to_proc, wins = c(case_grds[i,]), 
       parallel = F, 
       progress = F)
-  
-    # get predicted, normalized from interpolation grid
-    prd_nrm <- prdnrm_fun(int_proc, to_proc)
     
-    # save interpolation grid
-    int_nm <-paste0(case, '_intgrd_', i) 
-    assign(int_nm, int_proc)
+    # save results for each window
+    wtreg_nm <-paste0(case, '_wtreg_', i) 
+    assign(wtreg_nm, wtreg)
     save(
-      list = int_nm,
-      file=paste0(case,'_intgrd_', i, '.RData')
-      )
-    
-    # save predicted, normalized results
-    prdnrm_nm <-paste0(case, '_prdnrm_', i) 
-    assign(prdnrm_nm, prd_nrm)
-    save(
-      list = prdnrm_nm,
-      file=paste0(case,'_prdnrm_', i, '.RData')
+      list = wtreg_nm,
+      file=paste0(wtreg_nm, '.RData')
       )
 
     # clear RAM
-    rm(list = c(int_nm, prdnrm_nm))
+    rm(list = c(wtreg_nm))
     
     }
   
   }
 
 stopCluster(cl)
-
-######
-# get metab ests for observed and normalized data
 
 #####
 # get metab ests before and after detiding
@@ -107,7 +93,7 @@ registerDoParallel(cl)
 # start time
 strt <- Sys.time()
 
-cases <- list.files(path = getwd(), pattern = '_prdnrm_')
+cases <- list.files(path = getwd(), pattern = '_wtreg_')
 
 # metab ests as list
 met_ls <- foreach(case = cases) %dopar% {
@@ -122,7 +108,7 @@ met_ls <- foreach(case = cases) %dopar% {
   # get data for eval
   load(case)
   nm <- gsub('.RData', '', case)
-  stat <- gsub('_prdnrm_[0-9]+$', '', nm)
+  stat <- gsub('_wtreg_[0-9]+$', '', nm)
   dat_in <- get(nm)
   
   # get metab for obs DO
