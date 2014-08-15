@@ -365,9 +365,8 @@ points(DO_nrm ~ DateTimeStamp, prd_nrm, type = 'p',
 # figure of of DO/metab correlations before after, detiding
 # note that tide in met_ls is daily average of hourly tidal change
 
-# metab and inst flux data
+# metab data
 load('met_ls.RData')
-# load('met_ls_inst.RData')
 load('case_grds.RData')
 
 # go through each site for DO cors, use metab list for metab cors
@@ -499,8 +498,8 @@ load('met_ls.RData')
 
 # subset metab estimates by case and window comb
 load('case_grds.RData')
-sel_vec <- with(case_grds, which(dec_time == 2 & hour == 6 & Tide == 0.5))
-sel_vec <- paste0('PDBBY', '_prdnrm_', sel_vec)
+sel_vec <- with(case_grds, which(dec_time == 4 & hour == 6 & Tide == 1))
+sel_vec <- paste0('PDBBY', '_wtreg_', sel_vec, '.RData')
 
 met_sub <- met_ls[grep(sel_vec, names(met_ls))]
 

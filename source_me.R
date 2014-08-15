@@ -32,9 +32,9 @@ cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # window widths grid
-dy_wins <- c(1, 2, 4, 8)
-hr_wins <- c(3, 6, 12, 24)
-td_wins <- c(0.25, 0.5, 1, 2)
+dy_wins <- c(1, 3, 8)
+hr_wins <- c(6, 12, 24)
+td_wins <- c(0.25, 0.5, 1)
 case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
 names(case_grds) <- c('dec_time', 'hour', 'Tide')
 save(case_grds, file = 'case_grds.RData')
@@ -77,7 +77,7 @@ for(case in cases){
     assign(wtreg_nm, wtreg)
     save(
       list = wtreg_nm,
-      file=paste0(wtreg_nm, '.RData')
+      file=paste0('wtreg/', wtreg_nm, '.RData')
       )
 
     # clear RAM
@@ -100,7 +100,7 @@ registerDoParallel(cl)
 # start time
 strt <- Sys.time()
 
-cases <- list.files(path = getwd(), pattern = '_wtreg_')
+cases <- list.files(path = paste0(getwd(), '/wtreg/'), pattern = '_wtreg_')
 
 # metab ests as list
 met_ls <- foreach(case = cases) %dopar% {
@@ -113,7 +113,7 @@ met_ls <- foreach(case = cases) %dopar% {
   sink()
   
   # get data for eval
-  load(case)
+  load(paste0('wtreg/', case))
   nm <- gsub('.RData', '', case)
   stat <- gsub('_wtreg_[0-9]+$', '', nm)
   dat_in <- get(nm)

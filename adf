@@ -1,0 +1,100 @@
+commit a17cee74ce78ac98a319765b11da568c01c0dc16
+Merge: a2862b3 c0da8b6
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Thu Aug 7 14:20:15 2014 -0500
+
+    commit after merging back_to_grd with master, fixed merge conflicts manually
+    
+    Merge branch 'back_to_grd'
+    
+    Conflicts:
+    	.Rprofile
+    	.gitignore
+    	case_funs.r
+    	extra.R
+    	log.txt
+    	source_me.R
+
+commit c0da8b64a918949607897bd25ca0ff0468d98ae6
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Thu Aug 7 09:39:40 2014 -0500
+
+    detiding works like a charm
+
+commit 7f24447aa73e47253ecb334bd8fee9802ae5efa1
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Wed Aug 6 12:54:13 2014 -0500
+
+    detiding with weighted mean by tidal occurrence, does not work
+
+commit 12100da912e8b58a93d3f5da12041c0e12b97ec1
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Tue Aug 5 14:53:29 2014 -0500
+
+    processing of first two cases using new sinusoidal
+
+commit 3b261b546ec11e38bfd65304c57478247968b3c0
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Fri Aug 1 16:28:46 2014 -0500
+
+    started back_to_grd again using correct sinusoidal period
+
+commit a2862b31d922b64dc034623cb0cb131ea1278367
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Wed Jul 30 09:38:58 2014 -0500
+
+    safety commit before going back to old interpolation grid method
+
+commit d6aa1c870accd8ff060802a04931f7abb3d898ad
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Mon Jul 28 16:19:27 2014 -0500
+
+    back to tri-cube after reading Hirsch justification
+
+commit 323092282f9a0245b0d48dbedd53025621cce697
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Fri Jul 25 11:29:20 2014 -0500
+
+    redo sims with missing values linearly inteprolated and boxcar window weighting
+
+commit aa83a5c7fa611a4e6a588ef6c1dc3a69f1696298
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Wed Jul 23 10:14:19 2014 -0500
+
+    changed weighting scheme using day and tide, also checked day windows 5 to 40
+
+commit 7d2b839d9128e28ac566d45f20e3430d5ce26bf4
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Fri Jul 18 10:15:37 2014 -0500
+
+    Trying multiple window widths for cases
+
+commit 29050d60a6472c48db42defb31057a5030f738a0
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Tue Jul 15 18:28:27 2014 -0500
+
+    changes to source_me for metab and inst flux
+
+commit b1f19c8e9274bbf9dec83324db9320eebe0ccce1
+Author: fawda123 <mbafs2012@gmail.com>
+Date:   Tue Jul 15 14:07:41 2014 -0500
+
+    fixed gitignore adn output pdf
+
+commit 15fb0f750a27d063601c8408dc5a63eed993ed1d
+Author: fawda123 <mbeck@D2626XMBECK3.aa.ad.epa.gov>
+Date:   Sun Jun 22 17:31:03 2014 -0500
+
+    model changes: no sine, different detiding
+
+commit a4973e9b14ee460dd87d46ce619821587a9da95e
+Author: fawda123 <mbeck@D2626XMBECK3.aa.ad.epa.gov>
+Date:   Fri Jun 20 18:29:50 2014 -0500
+
+    I need to change the way detided values are calculated
+
+commit 50ee62463a7dc3e62ad572d57b43e754e4904ab2
+Author: fawda123 <mbeck@D2626XMBECK3.aa.ad.epa.gov>
+Date:   Thu Jun 19 14:59:04 2014 -0500
+
+    first commit
