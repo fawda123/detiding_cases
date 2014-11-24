@@ -32,9 +32,9 @@ cl <- makeCluster(8)
 registerDoParallel(cl)
 
 # window widths grid
-dy_wins <- c(1, 3, 6)
-hr_wins <- c(1, 3, 6)
-td_wins <- c(0.25, 0.5, 1)
+dy_wins <- c(1, 3, 6, 9, 12)
+hr_wins <- c(1, 3, 6, 9, 12)
+td_wins <- c(0.2, 0.4, 0.6, 0.8, 1)
 case_grds <- expand.grid(dy_wins, hr_wins, td_wins)
 names(case_grds) <- c('dec_time', 'hour', 'Tide')
 save(case_grds, file = 'case_grds.RData')
