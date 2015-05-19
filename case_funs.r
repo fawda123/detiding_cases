@@ -1000,13 +1000,13 @@ tide.fun <- function(time.in, waves.in, scl.up = 4, all = F){
 ######
 #calculate number of anomolous estimates from nem output
 #'nem.in' is output from 'nem.fun'
-anoms.fun<-function(nem.in){
-  Pg<-nem.in$Pg
+anoms.fun<-function(nem.in, pgvar = 'Pg', rtvar = 'Rt'){
+  Pg<-nem.in[, pgvar]
   Pg<-sum(Pg<=0,na.rm=T)/length(na.omit(Pg))
-  Rt<-nem.in$Rt
+  Rt<-nem.in[, rtvar]
   Rt<-sum(Rt>=0,na.rm=T)/length(na.omit(Rt))
   return(data.frame(Pg,Rt))
-  }
+}
 
 ######
 #r.squared function
@@ -1176,7 +1176,7 @@ poly.fun<-function(flag.in,dat, fill.val='yellow1'){
    
     x.vals <- sapply(1:nrow(plo.dates), 
            function(x) plo.dates[x,],simplify=F)
-    x.vals<-suppressMessages(
+    x.vals<-suppressWarnings(
       melt(x.vals, measure.vars = names(x.vals[[1]]))$value
       )
     x.vals<-as.POSIXct(x.vals, tz, origin = '1970-01-01')

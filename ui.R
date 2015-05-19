@@ -4,25 +4,38 @@ library(shiny)
 shinyUI(pageWithSidebar(
   
   # Application title
-  headerPanel("Tidal height and metabolism correlations as a function of half-window widths"),
+  headerPanel("Case studies for weighted regression"),
   
   # Sidebar with a slider input for number of observations
   sidebarPanel(
-  
-    radioButtons('day', label = h3('Day'),
-      choices = list("one" = 1, "three" = 3, "six" = 6, "nine" = 9, "twelve" = 12), selected = 1),
+    selectInput("case", "Choose a site:", 
+                list("Elkhorn Slough" = "ELKVM", 
+                     "Padilla Bay" = "PDBBY", 
+                     "Rookery Bay" = "RKBMB",
+                     "Sapelo Island" = "SAPDC"),
+                selected = 'Sapelo Island'
+                ),
+    selectInput("daywin", "Choose a day window:", 
+                c(1, 3, 6, 9 , 12)
+                ),
+    selectInput("hourwin", "Choose an hour window:", 
+                c(1, 3, 6, 9, 12)
+                ),
+    selectInput("tidwin", "Choose a tide window:", 
+                c(0.2, 0.4, 0.6, 0.8, 1)
+                ),
+    dateRangeInput("daterange", "Date range for plot:",
+                   start = "2012-01-01",
+                   end   = "2012-12-31", 
+                   min   = "2012-01-01", 
+                   max   = "2012-12-31"),
+    checkboxInput('corr', 'Show DO and tide scatterplot only', value = FALSE)
     
-    radioButtons('hour', label = h3('Hour'),
-      choices = list("one" = 1, "three" = 3, "six" = 6, "nine" = 9, "twelve" = 12), selected = 1),
-    
-    radioButtons('tide', label = h3('Tidal range'), 
-      choices = list("0.2" = 0.2, "0.4" = 0.4, "0.6" = 0.6, "0.8" = 0.8, "1" = 1), selected = 0.2)
-    
+
   ),
   
   # Show a plot of the generated distribution
   mainPanel(
-    plotOutput("simplot", width = "100%")
+    plotOutput("resplot", width = "100%")
   )
-    
 ))
